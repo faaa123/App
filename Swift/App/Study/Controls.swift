@@ -1,5 +1,6 @@
 import StudyCore
 import SwiftUI
+import UIKit
 
 /// A 24-hour time picker bound to a logical-day offset. As an end time, 4:00
 /// means the end of the day (1440).

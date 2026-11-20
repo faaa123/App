@@ -1,5 +1,6 @@
 import StudyCore
 import SwiftUI
+import UIKit
 import Testing
 @testable import StudyApp
 
