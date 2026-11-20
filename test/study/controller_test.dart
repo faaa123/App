@@ -92,6 +92,28 @@ void main() {
     c.dispose();
   });
 
+  test('unlinking a weekday does not take over shared weekdays', () async {
+    final c = make();
+    await c.init();
+    await c.saveAsPreset('A');
+    await c.saveAsPreset('B');
+    final a = c.presets.firstWhere((p) => p.name == 'A').id;
+    final b = c.presets.firstWhere((p) => p.name == 'B').id;
+    await c.setPresetWeekdays(a, {1, 2});
+    clock = clock.add(const Duration(minutes: 1));
+    await c.setPresetWeekdays(b, {2}); // linked later: B wins Tuesday
+    expect(c.presetForWeekday(2)?.name, 'B');
+
+    clock = clock.add(const Duration(minutes: 1));
+    await c.setPresetWeekdays(a, {2}); // only Monday removed
+    expect(c.presetForWeekday(2)?.name, 'B');
+
+    clock = clock.add(const Duration(minutes: 1));
+    await c.setPresetWeekdays(a, {2, 3}); // adding links A again
+    expect(c.presetForWeekday(2)?.name, 'A');
+    c.dispose();
+  });
+
   Future<StudyController> withSaturdayPreset() async {
     final c = make();
     await c.init();

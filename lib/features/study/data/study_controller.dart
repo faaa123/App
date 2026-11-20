@@ -173,9 +173,12 @@ class StudyController extends ChangeNotifier {
 
   Future<void> setPresetWeekdays(String id, Set<int> weekdays) async {
     final i = _data.presets.indexWhere((p) => p.id == id);
+    // "The preset linked later wins" (D-2): only adding a weekday counts as
+    // linking, so removing one does not take over other shared weekdays.
+    final added = weekdays.difference(_data.presets[i].weekdays).isNotEmpty;
     _data.presets[i] = _data.presets[i].copyWith(
       weekdays: weekdays,
-      updatedAt: now(),
+      updatedAt: added ? now() : null,
     );
     await _commit();
   }
