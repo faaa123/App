@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/stats.dart';
 import 'block_dialogs.dart';
+import 'readable_list.dart';
 import 'study_scope.dart';
 
 const _weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
@@ -16,8 +17,7 @@ class PresetsPage extends StatelessWidget {
     final presets = c.presets;
     return Scaffold(
       appBar: AppBar(title: const Text('プリセット')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
+      body: ReadableListView(
         children: [
           Text(
             '曜日を選ぶと、その曜日になったとき（4:00〜）自動でスケジュールを置き換えます。'

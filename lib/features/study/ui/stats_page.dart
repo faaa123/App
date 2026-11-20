@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/logical_day.dart';
+import 'readable_list.dart';
 import 'study_scope.dart';
 import 'time_picking.dart';
 
@@ -26,8 +27,11 @@ class StatsPage extends StatelessWidget {
     ];
 
     final week = lastDays(7), month = lastDays(30);
-    return ListView(
-      padding: const EdgeInsets.all(32),
+    return ReadableListView(
+      maxWidth: 900,
+      gutter: 32,
+      top: 32,
+      bottom: 32,
       children: [
         Text('統計', style: text.headlineMedium),
         const SizedBox(height: 4),

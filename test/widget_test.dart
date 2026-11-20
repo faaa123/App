@@ -5,6 +5,7 @@ import 'package:app/features/study/data/chime_scheduler.dart';
 import 'package:app/features/study/data/study_controller.dart';
 import 'package:app/features/study/data/study_store.dart';
 import 'package:app/features/study/ui/block_dialogs.dart';
+import 'package:app/features/study/ui/readable_list.dart';
 import 'package:app/features/study/ui/stats_page.dart';
 import 'package:app/features/study/ui/study_scope.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -232,5 +233,21 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(result, '平日');
+  });
+
+  testWidgets('readable list caps and centers content on a wide screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReadableListView(children: [SizedBox(height: 10, key: Key('c'))]),
+      ),
+    );
+    final rect = tester.getRect(find.byKey(const Key('c')));
+    expect(rect.width, 760);
+    expect(rect.left, (1366 - 760) / 2);
   });
 }

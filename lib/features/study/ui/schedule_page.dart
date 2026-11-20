@@ -6,6 +6,7 @@ import '../core/stats.dart';
 import '../data/study_controller.dart';
 import 'block_dialogs.dart';
 import 'presets_page.dart';
+import 'readable_list.dart';
 import 'study_scope.dart';
 
 /// Edit the (single, permanent) schedule.
@@ -44,8 +45,7 @@ class SchedulePage extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
+      body: ReadableListView(
         children: [
           Text(
             '1日の合計勉強時間：${formatMinutes(totalStudyMinutes(blocks))}',
