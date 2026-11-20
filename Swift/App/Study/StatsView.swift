@@ -51,6 +51,9 @@ struct DayMinutes: Identifiable {
 private struct StreakCard: View {
     let streak: Int
     @Binding var threshold: Int
+    /// Grows with Dynamic Type like the large-title style.
+    @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 56
+    @ScaledMetric(relativeTo: .largeTitle) private var flameSize: CGFloat = 36
 
     var body: some View {
         Card {
@@ -65,10 +68,10 @@ private struct StreakCard: View {
     private var count: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: streak > 0 ? "flame.fill" : "flame")
-                .font(.system(size: 36))
+                .font(.system(size: flameSize))
                 .foregroundStyle(streak > 0 ? AnyShapeStyle(Color.orange) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
             Text("\(streak)")
-                .font(.system(size: 56, weight: .semibold, design: .rounded).monospacedDigit())
+                .font(.system(size: numberSize, weight: .semibold, design: .rounded).monospacedDigit())
             Text("日連続").font(.title2)
         }
         .accessibilityElement(children: .ignore)
