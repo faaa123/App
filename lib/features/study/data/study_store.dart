@@ -8,6 +8,10 @@ import 'package:path_provider/path_provider.dart';
 abstract interface class StudyStore {
   Future<Map<String, dynamic>?> load();
   Future<void> save(Map<String, Object?> json);
+
+  /// Keeps a copy of the stored file as it is now (before a save would drop
+  /// entries that could not be parsed).
+  Future<void> keepCopy(String tag);
 }
 
 /// One JSON file in Application Support, written atomically.
@@ -39,6 +43,27 @@ class FileStudyStore implements StudyStore {
     }
   }
 
+  /// Copies study.json to `study.json.<tag>-<epochMs>` and keeps only the
+  /// newest few copies per tag.
+  @override
+  Future<void> keepCopy(String tag) async {
+    final f = await _file();
+    if (!await f.exists()) return;
+    await f.copy('${f.path}.$tag-${DateTime.now().millisecondsSinceEpoch}');
+    final prefix = '${f.path}.$tag-';
+    final copies = [
+      await for (final e in f.parent.list())
+        if (e is File && e.path.startsWith(prefix)) e,
+    ]..sort((a, b) => b.path.compareTo(a.path));
+    for (final old in copies.skip(_keepCopies)) {
+      try {
+        await old.delete();
+      } catch (_) {}
+    }
+  }
+
+  static const _keepCopies = 3;
+
   Future<void> _queue = Future.value();
 
   /// Writes are serialized, so overlapping calls never share the temp file and
@@ -69,4 +94,10 @@ class MemoryStudyStore implements StudyStore {
   @override
   Future<void> save(Map<String, Object?> json) async =>
       data = jsonDecode(jsonEncode(json)) as Map<String, dynamic>;
+
+  /// Tags passed to [keepCopy], for tests.
+  final copies = <String>[];
+
+  @override
+  Future<void> keepCopy(String tag) async => copies.add(tag);
 }

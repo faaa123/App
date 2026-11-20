@@ -163,6 +163,29 @@ void main() {
     expect(c.presets.single.weekdays, {1});
     expect(c.threshold, 30);
     expect(c.minutesByDate().containsKey('x'), isFalse);
+    expect(store.copies, ['partial']);
+    c.dispose();
+  });
+
+  test('a cleanly parsed file is not copied aside', () async {
+    final c = make();
+    await c.init();
+    await c.addBlock(blk(c, 'a', BlockType.study, o(9, 0), o(10, 0)));
+    await c.saveAsPreset('p');
+    await c.setPresetWeekdays(c.presets.single.id, {1});
+    c.dispose();
+
+    final reopened = make();
+    await reopened.init();
+    expect(store.copies, isEmpty);
+    reopened.dispose();
+  });
+
+  test('a newer file version is copied aside before saving', () async {
+    store = MemoryStudyStore({'version': 2, 'blocks': []});
+    final c = make();
+    await c.init();
+    expect(store.copies, ['partial']);
     c.dispose();
   });
 

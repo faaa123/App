@@ -51,7 +51,15 @@ class StudyController extends ChangeNotifier {
   Future<void> init() async {
     try {
       final json = await _store.load();
-      if (json != null) _data = StudyData.fromJson(json);
+      if (json != null) {
+        _data = StudyData.fromJson(json);
+        // Keep the original before any save drops what could not be parsed.
+        if (_data.lossy) {
+          await _store.keepCopy('partial').catchError((Object e) {
+            debugPrint('study backup failed: $e');
+          });
+        }
+      }
     } catch (e) {
       debugPrint('study data unreadable, starting fresh: $e');
       _data = StudyData();

@@ -1,16 +1,19 @@
 import '../core/block.dart';
 
 /// Parses what can be parsed: entries that fail (bad types, impossible
-/// offsets, overlaps with an earlier block) are dropped instead of throwing.
-List<Block> _parseBlocks(Object? list) {
+/// offsets, overlaps with an earlier block) are dropped instead of throwing,
+/// and reported through [onDrop].
+List<Block> _parseBlocks(Object? list, [void Function()? onDrop]) {
   final out = <Block>[];
   for (final b in list is List ? list : const []) {
     try {
       final block = Block.fromJson(b as Map<String, dynamic>);
       if (out.every((o) => block.end <= o.start || block.start >= o.end)) {
         out.add(block);
+        continue;
       }
     } catch (_) {}
+    onDrop?.call();
   }
   return sortedByStart(out);
 }
@@ -51,16 +54,22 @@ class Preset {
     'updatedAt': updatedAt.millisecondsSinceEpoch,
   };
 
-  factory Preset.fromJson(Map<String, dynamic> j) => Preset(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    blocks: _parseBlocks(j['blocks']),
-    weekdays: {
-      for (final w in j['weekdays'] as List? ?? const [])
+  factory Preset.fromJson(Map<String, dynamic> j, [void Function()? onDrop]) {
+    final weekdays = j['weekdays'] as List? ?? const [];
+    final valid = {
+      for (final w in weekdays)
         if (w is int && w >= 0 && w <= 6) w,
-    },
-    updatedAt: DateTime.fromMillisecondsSinceEpoch(j['updatedAt'] as int),
-  );
+    };
+    final preset = Preset(
+      id: j['id'] as String,
+      name: j['name'] as String,
+      blocks: _parseBlocks(j['blocks'], onDrop),
+      weekdays: valid,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(j['updatedAt'] as int),
+    );
+    if (valid.length != weekdays.length) onDrop?.call();
+    return preset;
+  }
 }
 
 /// Everything the study feature persists.
@@ -87,6 +96,10 @@ class StudyData {
   /// Streak threshold in minutes.
   int threshold;
 
+  /// Set by [StudyData.fromJson] when something stored could not be kept
+  /// (dropped entries, an unknown version): the next save would lose it.
+  bool lossy = false;
+
   Map<String, Object?> toJson() => {
     'version': 1,
     'blocks': [for (final b in blocks) b.toJson()],
@@ -96,27 +109,41 @@ class StudyData {
     'threshold': threshold,
   };
 
-  factory StudyData.fromJson(Map<String, dynamic> j) => StudyData(
-    blocks: _parseBlocks(j['blocks']),
-    presets: [
-      for (final p in j['presets'] is List ? j['presets'] as List : const [])
-        ?_tryParse(() => Preset.fromJson(p as Map<String, dynamic>)),
-    ],
-    summaries: {
-      for (final e in (j['summaries'] is Map ? j['summaries'] as Map : const {})
-          .entries)
+  factory StudyData.fromJson(Map<String, dynamic> j) {
+    var lossy = j['version'] != 1;
+    void drop() => lossy = true;
+    final rawPresets = j['presets'] is List ? j['presets'] as List : const [];
+    final presets = [
+      for (final p in rawPresets)
+        ?_tryParse(() => Preset.fromJson(p as Map<String, dynamic>, drop)),
+    ];
+    final rawSummaries = j['summaries'] is Map
+        ? j['summaries'] as Map
+        : const {};
+    final summaries = {
+      for (final e in rawSummaries.entries)
         if (_validDateKey(e.key) != null && e.value is int && e.value >= 0)
           e.key as String: e.value as int,
-    },
-    lastRecorded: _validDateKey(j['lastRecorded']),
+    };
+    final t = j['threshold'];
     // setThreshold keeps it ≥ 10; calculateStreak throws on ≤ 0.
-    threshold:
-        j['threshold'] is int &&
-            (j['threshold'] as int) >= 10 &&
-            (j['threshold'] as int) <= 1440
-        ? j['threshold'] as int
-        : 30,
-  );
+    final validThreshold = t is int && t >= 10 && t <= 1440;
+    final lastRecorded = _validDateKey(j['lastRecorded']);
+    final data = StudyData(
+      blocks: _parseBlocks(j['blocks'], drop),
+      presets: presets,
+      summaries: summaries,
+      lastRecorded: lastRecorded,
+      threshold: validThreshold ? t : 30,
+    );
+    data.lossy =
+        lossy ||
+        presets.length != rawPresets.length ||
+        summaries.length != rawSummaries.length ||
+        (t != null && !validThreshold) ||
+        (j['lastRecorded'] != null && lastRecorded == null);
+    return data;
+  }
 }
 
 T? _tryParse<T>(T Function() parse) {
