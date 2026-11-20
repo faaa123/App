@@ -37,6 +37,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   pencil_canvas:
     path: packages/pencil_canvas
+  path_provider: ^2.1.6
+  flutter_local_notifications: ^23.0.3
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:
