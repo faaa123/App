@@ -42,11 +42,10 @@ struct StatsView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
             }
-            .padding(.horizontal, wide ? 40 : 20)
-            .padding(.vertical, 20)
+            .padding(20)
         }
         .readableWidth(1280)
-        .background(Theme.page)
+        .background(Color(.systemGroupedBackground))
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .navigationTitle("統計")
     }
@@ -71,7 +70,8 @@ struct StatsView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(Format.minutes(total))
-                    .font(.title.weight(.semibold).monospacedDigit())
+                    .font(.title.bold())
+                    .monospacedDigit()
                 Text("平均 \(Format.minutes(total / max(week.count, 1)))")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -97,28 +97,30 @@ struct DayMinutes: Identifiable {
     var id: String { date.key }
 }
 
-/// The streak on the screen's one ink (hero) card.
+/// The streak, with the study color on the flame while it runs.
 private struct StreakTile: View {
     let streak: Int
     /// Grows with Dynamic Type like the large-title style.
     @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 56
 
     var body: some View {
-        Card(fill: Theme.hero) {
+        Card {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: streak > 0 ? "flame.fill" : "flame")
-                        .foregroundStyle(streak > 0 ? BlockStyle.rest.color : Theme.heroSecondary)
+                    Image(systemName: "flame")
+                        .symbolVariant(streak > 0 ? .fill : .none)
+                        .foregroundStyle(streak > 0 ? AnyShapeStyle(BlockStyle.study.color)
+                                         : AnyShapeStyle(HierarchicalShapeStyle.secondary))
                     Text("連続達成")
-                        .foregroundStyle(Theme.heroSecondary)
+                        .foregroundStyle(.secondary)
                 }
                 .font(.subheadline.weight(.semibold))
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(streak)")
-                        .font(.system(size: numberSize, weight: .semibold).monospacedDigit())
-                    Text("日").font(.title2.weight(.semibold))
+                        .font(.system(size: numberSize, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                    Text("日").font(.title2.bold())
                 }
-                .foregroundStyle(Theme.heroText)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -130,8 +132,8 @@ private struct StreakTile: View {
 
 /// Bars per day with the goal as a dashed rule. Met days are solid with a
 /// check mark; missed days are grey, so the difference is in shape as well as
-/// color. Today (an estimate) is a paler blue. Swift Charts adds VoiceOver's audio graph; each bar reads as
-/// "11月20日、1時間30分、達成".
+/// color. Today (an estimate) is paler. Swift Charts adds VoiceOver's audio
+/// graph; each bar reads as "11月20日、1時間30分、達成".
 private struct PeriodCard: View {
     let title: String
     let days: [DayMinutes]
@@ -176,7 +178,7 @@ private struct PeriodCard: View {
                     y: .value("勉強時間", d.minutes),
                     width: .ratio(0.7)
                 )
-                .foregroundStyle(d.isToday ? mark.opacity(0.45) : ok ? mark : Theme.free)
+                .foregroundStyle(d.isToday ? mark.opacity(0.5) : ok ? mark : Color(.systemGray3))
                 .cornerRadius(4)
                 .annotation(position: .top, spacing: 4) {
                     if showsValues && d.minutes > 0 {
@@ -204,9 +206,9 @@ private struct PeriodCard: View {
                             Text(Format.minutes(d.minutes))
                                 .font(.headline.monospacedDigit())
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.tertiarySystemGroupedBackground), in: .rect(cornerRadius: 12, style: .continuous))
                     }
                     .accessibilityHidden(true)
             }

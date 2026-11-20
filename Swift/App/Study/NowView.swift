@@ -13,7 +13,7 @@ struct NowView: View {
         }
         .navigationTitle(Format.date(study.today))
         .navigationBarTitleDisplayMode(.inline)
-        .background(Theme.page)
+        .background(Color(.systemGroupedBackground))
     }
 
     private static var alignedStart: Date {
@@ -47,7 +47,7 @@ private struct NowContent: View {
                 // The day's timetable sits beside the countdown when there is
                 // room (landscape, or a large iPad); otherwise the band below.
                 let wide = geo.size.width >= 960 && !blocks.isEmpty
-                let gap: CGFloat = compact ? 16 : 24
+                let gap: CGFloat = compact ? 16 : 20
                 HStack(alignment: .top, spacing: gap) {
                     VStack(spacing: gap) {
                         StatusPanel(status: status, hasToday: !blocks.isEmpty, compact: compact)
@@ -71,9 +71,9 @@ private struct NowContent: View {
                             .frame(width: 340)
                     }
                 }
-                .padding(.horizontal, compact ? 16 : 40)
+                .padding(.horizontal, compact ? 16 : 20)
                 .padding(.top, compact ? 4 : 12)
-                .padding(.bottom, compact ? 12 : 32)
+                .padding(.bottom, compact ? 12 : 24)
             }
         }
     }
@@ -89,8 +89,7 @@ private struct StatusPanel: View {
         case .inBlock(let s):
             let style = BlockStyle.of(s.block.type)
             Panel(
-                fill: style.color, onColor: style.onColor, onSecondary: style.onSecondary,
-                accent: style.onAccent, icon: style.icon,
+                fill: style.color, onColor: style.onColor, icon: style.icon,
                 kicker: "\(style.label)中",
                 title: s.block.name,
                 seconds: s.remainingSeconds,
@@ -109,14 +108,12 @@ private struct StatusPanel: View {
 }
 
 /// The big status card (content layer: a solid fill, not glass). The
-/// countdown is the hero; block colors stay strong because they carry
-/// meaning, and the icon and label repeat it for anyone who can't tell them
-/// apart.
+/// countdown is the hero; block colors carry meaning, and the icon and label
+/// repeat it for anyone who can't tell them apart. Secondary text uses the
+/// hierarchical styles, so it is derived from `onColor`.
 private struct Panel: View {
-    var fill: Color = Theme.surface
+    var fill: Color = Color(.secondarySystemGroupedBackground)
     var onColor: Color = .primary
-    var onSecondary: Color = .secondary
-    var accent: Color = Theme.accent
     let icon: String
     let kicker: String
     let title: String
@@ -126,6 +123,9 @@ private struct Panel: View {
     var endLabel: String? = nil
     let compact: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The countdown's preferred size, scaled with Dynamic Type; it still
+    /// shrinks to fit the card.
+    @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 200
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 8 : 16) {
@@ -133,9 +133,9 @@ private struct Panel: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(kicker)
                         .font(.headline)
-                        .foregroundStyle(onSecondary)
+                        .foregroundStyle(.secondary)
                     Text(title)
-                        .font(.largeTitle.weight(.bold))
+                        .font(.largeTitle.bold())
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
@@ -143,15 +143,15 @@ private struct Panel: View {
                 Spacer(minLength: 0)
                 Image(systemName: icon)
                     .font(.largeTitle)
-                    .foregroundStyle(onSecondary)
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
 
             if let seconds {
                 // Gives up size first in short windows or with large text.
                 Text(Format.countdown(seconds))
-                    .font(.system(size: 240, weight: .semibold).monospacedDigit())
-                    .kerning(-6)
+                    .font(.system(size: countdownSize, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.05)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -165,8 +165,8 @@ private struct Panel: View {
             }
 
             if let progress {
-                SegmentedProgress(value: progress, on: accent, off: onColor.opacity(0.2))
-                    .frame(height: compact ? 8 : 10)
+                SegmentedProgress(value: progress)
+                    .frame(height: 8)
                     .accessibilityElement()
                     .accessibilityLabel("進み具合")
                     .accessibilityValue("\(Int((progress * 100).rounded()))%")
@@ -174,39 +174,38 @@ private struct Panel: View {
             if startLabel != nil || endLabel != nil {
                 HStack {
                     if let startLabel {
-                        Text(startLabel).foregroundStyle(onSecondary)
+                        Text(startLabel).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 16)
                     if let endLabel {
                         Text(endLabel).fontWeight(.semibold)
                     }
                 }
-                .font(.title3.monospacedDigit())
+                .font(.title3)
+                .monospacedDigit()
             }
         }
         .foregroundStyle(onColor)
-        .padding(.horizontal, compact ? 24 : 44)
-        .padding(.vertical, compact ? 20 : 36)
+        .padding(compact ? 20 : 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(fill, in: .rect(cornerRadius: 32))
+        .background(fill, in: .rect(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 }
 
-/// Ten segments that fill one after another (the last partly).
+/// Ten segments that fill one after another (the last partly), in the
+/// current foreground style over its quaternary track.
 private struct SegmentedProgress: View {
     let value: Double
-    let on: Color
-    let off: Color
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(0..<10, id: \.self) { i in
                 let part = min(max(value * 10 - Double(i), 0), 1)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3).fill(off)
-                        RoundedRectangle(cornerRadius: 3).fill(on)
+                        Capsule().fill(.quaternary)
+                        Capsule().fill(.primary)
                             .frame(width: geo.size.width * part)
                     }
                 }
@@ -221,12 +220,12 @@ private struct NextCard: View {
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("次")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if let n = next {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         BlockMark(type: n.block.type, height: 18)
                         Text("\(Format.titled(n.block)) \(Format.minutes(n.block.duration))")
                             .font(.title3.weight(.semibold))
@@ -271,16 +270,15 @@ private struct TodayCard: View {
                 Text("今日の勉強")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(Format.minutes(done))
                         .font(.title3.weight(.semibold))
                     Text("/ \(Format.minutes(total))")
                         .foregroundStyle(.secondary)
                 }
                 .monospacedDigit()
-                ProgressBar(value: total > 0 ? Double(done) / Double(total) : 0,
-                            color: Theme.accent, track: Theme.track)
-                    .frame(height: 8)
+                ProgressView(value: total > 0 ? Double(done) / Double(total) : 0)
+                    .tint(BlockStyle.study.color)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -290,8 +288,8 @@ private struct TodayCard: View {
     }
 }
 
-/// Today's blocks as a list beside the countdown, the current one in the
-/// hero color; free time between blocks shows as a dashed row.
+/// Today's blocks as a list beside the countdown, the current one filled
+/// with its block color; free time between blocks shows as a dashed row.
 private struct TodayTimetable: View {
     let blocks: [Block]
     let offset: Int
@@ -301,16 +299,15 @@ private struct TodayTimetable: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("今日")
-                    .font(.title3.weight(.bold))
+                    .font(.title3.bold())
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("編集") { router.tab = .schedule }
-                    .fontWeight(.semibold)
             }
             .padding(.horizontal, 8)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 4) {
                         ForEach(items) { item in
                             switch item {
                             case .block(let b):
@@ -329,10 +326,10 @@ private struct TodayTimetable: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 24)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 20)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Theme.surface, in: .rect(cornerRadius: 32))
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26, style: .continuous))
     }
 
     private enum Item: Identifiable {
@@ -364,30 +361,33 @@ private struct TimetableRow: View {
     let offset: Int
 
     var body: some View {
+        let style = BlockStyle.of(block.type)
         let current = block.contains(offset)
         let past = block.end <= offset
-        let secondary = current ? AnyShapeStyle(Theme.heroSecondary) : AnyShapeStyle(HierarchicalShapeStyle.secondary)
-        let primary = current ? AnyShapeStyle(Theme.heroText) : past ? AnyShapeStyle(HierarchicalShapeStyle.secondary) : AnyShapeStyle(HierarchicalShapeStyle.primary)
         HStack(spacing: 12) {
             Text(LogicalDay.clock(block.start))
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(secondary)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .leading)
-            BlockMark(type: block.type, color: current ? Theme.heroAccent : nil, height: 20)
+            BlockMark(type: block.type, color: current ? style.onColor : nil, height: 20)
                 .opacity(past ? 0.5 : 1)
             Text(block.name)
                 .lineLimit(1)
             Spacer(minLength: 4)
             Text(Format.minutes(block.duration))
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(secondary)
+                .font(.footnote)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
-        .foregroundStyle(primary)
-        .padding(.horizontal, 10)
-        .frame(minHeight: 40)
-        .background(current ? Theme.hero : Color.clear, in: .rect(cornerRadius: 12))
+        .foregroundStyle(current ? AnyShapeStyle(style.onColor)
+                         : past ? AnyShapeStyle(HierarchicalShapeStyle.secondary)
+                         : AnyShapeStyle(HierarchicalShapeStyle.primary))
+        .padding(.horizontal, 8)
+        .frame(minHeight: 44)
+        .background(current ? style.color : Color.clear, in: .rect(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(current ? "実行中、" : "")\(BlockStyle.of(block.type).label)、\(block.name)")
+        .accessibilityLabel("\(current ? "実行中、" : "")\(style.label)、\(block.name)")
         .accessibilityValue("\(LogicalDay.clock(block.start))から\(LogicalDay.clock(block.end))まで")
     }
 }
@@ -399,52 +399,35 @@ private struct FreeRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(LogicalDay.clock(start))
-                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .font(.subheadline.weight(.semibold))
                 .frame(width: 48, alignment: .leading)
             DashedRule().frame(width: 12)
             Text("フリー")
             Spacer(minLength: 4)
             Text(Format.minutes(minutes))
-                .font(.footnote.monospacedDigit())
+                .font(.footnote)
         }
+        .monospacedDigit()
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .frame(minHeight: 40)
+        .padding(.horizontal, 8)
+        .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("フリー")
         .accessibilityValue("\(LogicalDay.clock(start))から\(Format.minutes(minutes))")
     }
 }
 
-/// A horizontal dashed line for free time.
+/// A horizontal dashed line for free time, in the current tertiary style.
 struct DashedRule: View {
-    var color: Color = Theme.free
-
     var body: some View {
         Canvas { ctx, size in
             var p = Path()
             p.move(to: CGPoint(x: 0, y: size.height / 2))
             p.addLine(to: CGPoint(x: size.width, y: size.height / 2))
-            ctx.stroke(p, with: .color(color), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+            ctx.stroke(p, with: .style(HierarchicalShapeStyle.tertiary),
+                       style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
         }
         .frame(height: 2)
         .accessibilityHidden(true)
-    }
-}
-
-/// A rounded track with a fill; draws the same at any height.
-struct ProgressBar: View {
-    let value: Double
-    let color: Color
-    var track: Color? = nil
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(track ?? color.opacity(0.25))
-                Capsule().fill(color)
-                    .frame(width: max(geo.size.height, geo.size.width * min(max(value, 0), 1)))
-            }
-        }
     }
 }

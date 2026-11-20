@@ -32,7 +32,7 @@ struct ScheduleView: View {
     var body: some View {
         let blocks = study.blocks
         let wide = width >= 960
-        HStack(alignment: .top, spacing: 24) {
+        HStack(alignment: .top, spacing: 20) {
             blockList(blocks, wide: wide)
             if wide {
                 SchedulePanel(
@@ -42,11 +42,11 @@ struct ScheduleView: View {
                     onDeleteAll: deleteAll)
                     .frame(width: 340)
                     .padding(.top, 20)
+                    .padding(.trailing, 20)
             }
         }
-        .padding(.horizontal, wide ? 24 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.page)
+        .background(Color(.systemGroupedBackground))
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .navigationTitle("スケジュール")
         .toolbar {
@@ -82,7 +82,6 @@ struct ScheduleView: View {
                 Section {
                     ScheduleSummary(showsTotal: true)
                 }
-                .listRowBackground(Theme.surface)
             }
             Section {
                 if blocks.isEmpty {
@@ -90,7 +89,6 @@ struct ScheduleView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .listRowBackground(Theme.surface)
                 } else {
                     let nowOffset = LogicalDay.offset(of: study.now().local)
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { i, b in
@@ -104,7 +102,7 @@ struct ScheduleView: View {
                                      isPast: b.end <= nowOffset)
                         }
                         .tint(.primary)
-                        .listRowBackground(current ? Theme.hero : Theme.surface)
+                        .listRowBackground(current ? BlockStyle.of(b.type).color : nil)
                         .accessibilityHint("編集します")
                         .accessibilityAction(named: "前へ移動") { move(from: i, to: i - 1) }
                         .accessibilityAction(named: "後ろへ移動") { move(from: i, to: i + 2) }
@@ -136,16 +134,14 @@ struct ScheduleView: View {
                     Button("ブロックを追加", systemImage: "plus") { editing = .new }
                     Button("ポモドーロで敷き詰める…", systemImage: "timer") { showPomodoro = true }
                 }
-                .listRowBackground(Theme.surface)
                 if !blocks.isEmpty {
                     Section {
                         DeleteAllButton(count: blocks.count, onConfirm: deleteAll)
                     }
-                    .listRowBackground(Theme.surface)
                 }
             }
         }
-        .scrollContentBackground(.hidden)
+        .listStyle(.insetGrouped)
         if wide {
             list
         } else {
@@ -198,8 +194,8 @@ private struct DeleteAllButton: View {
     }
 }
 
-/// The side panel of the wide layout: the day's total on the hero card, the
-/// main actions, and the notes.
+/// The side panel of the wide layout: the day's total, the main actions, and
+/// the notes.
 private struct SchedulePanel: View {
     let blocks: [Block]
     let onAdd: () -> Void
@@ -213,26 +209,23 @@ private struct SchedulePanel: View {
                 totalCard
                 Button(action: onAdd) {
                     Label("ブロックを追加", systemImage: "plus")
-                        .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
+                .controlSize(.large)
                 Button(action: onPomodoro) {
                     Label("ポモドーロで敷き詰める", systemImage: "timer")
-                        .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-                Card(padding: 20) {
+                .controlSize(.large)
+                Card {
                     ScheduleSummary(showsTotal: false)
                 }
                 if !blocks.isEmpty {
                     DeleteAllButton(count: blocks.count, onConfirm: onDeleteAll)
-                        .fontWeight(.semibold)
                         .padding(.top, 8)
                 }
             }
@@ -243,32 +236,30 @@ private struct SchedulePanel: View {
 
     private var totalCard: some View {
         let studyCount = blocks.filter(\.isStudy).count
-        return VStack(alignment: .leading, spacing: 14) {
-            Text("1日の勉強時間")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.heroSecondary)
-            Text(Format.minutes(totalStudyMinutes(blocks)))
-                .font(.largeTitle.weight(.semibold).monospacedDigit())
-            if let first = blocks.first, let last = blocks.last {
-                DayBand(blocks: blocks, nowOffset: LogicalDay.offset(of: study.now().local),
-                        showsLabels: false, height: 28)
-                HStack {
-                    Text(LogicalDay.clock(first.start))
-                    Spacer()
-                    Text("勉強 \(studyCount)・休憩 \(blocks.count - studyCount)")
-                    Spacer()
-                    Text(LogicalDay.clock(last.end))
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("1日の勉強時間")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(Format.minutes(totalStudyMinutes(blocks)))
+                    .font(.largeTitle.bold())
+                    .monospacedDigit()
+                if let first = blocks.first, let last = blocks.last {
+                    DayBand(blocks: blocks, nowOffset: LogicalDay.offset(of: study.now().local),
+                            showsLabels: false, height: 28)
+                    HStack {
+                        Text(LogicalDay.clock(first.start))
+                        Spacer()
+                        Text("勉強 \(studyCount)・休憩 \(blocks.count - studyCount)")
+                        Spacer()
+                        Text(LogicalDay.clock(last.end))
+                    }
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
                 }
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(Theme.heroSecondary)
             }
         }
-        .foregroundStyle(Theme.heroText)
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.hero, in: .rect(cornerRadius: 32))
-        // The band's marks and ticks use their dark-mode shades on the ink card.
-        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -279,7 +270,7 @@ private struct ScheduleSummary: View {
 
     var body: some View {
         let tomorrow = study.today.adding(days: 1)
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if showsTotal {
                 LabeledContent("1日の勉強時間") {
                     Text(Format.minutes(totalStudyMinutes(study.blocks)))
@@ -319,44 +310,43 @@ private struct BlockRow: View {
 
     var body: some View {
         let style = BlockStyle.of(block.type)
-        let secondary = isCurrent ? AnyShapeStyle(Theme.heroSecondary) : AnyShapeStyle(HierarchicalShapeStyle.secondary)
         VStack(alignment: .leading, spacing: 8) {
             if gapBefore > 0 {
                 // Free time between blocks, so the timetable reads like a day.
                 HStack(spacing: 8) {
-                    DashedRule(color: isCurrent ? Theme.heroSecondary : Theme.free)
-                        .frame(width: 12)
+                    DashedRule().frame(width: 12)
                     Text("フリー \(Format.minutes(gapBefore))")
                 }
                 .font(.caption)
-                .foregroundStyle(secondary)
+                .foregroundStyle(.secondary)
             }
             HStack(spacing: 16) {
-                BlockMark(type: block.type, color: isCurrent ? Theme.heroAccent : nil,
+                BlockMark(type: block.type, color: isCurrent ? style.onColor : nil,
                           height: block.isStudy ? 32 : 20)
                     .opacity(isPast ? 0.5 : 1)
                 // Times lead (they are what a timetable is scanned for); the
                 // name shows only when it says more than the type.
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rangeLabel(block))
-                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
                     Text(block.name == style.label
                          ? Format.minutes(block.duration)
                          : "\(block.name)・\(Format.minutes(block.duration))")
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 if isCurrent {
                     Text("いま")
                         .font(.caption.weight(.bold))
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .foregroundStyle(Color(hex: 0x16171B))
-                        .background(Theme.heroAccent, in: .capsule)
+                        .foregroundStyle(style.color)
+                        .background(style.onColor, in: .capsule)
                 }
             }
         }
-        .foregroundStyle(isCurrent ? AnyShapeStyle(Theme.heroText) : AnyShapeStyle(HierarchicalShapeStyle.primary))
+        .foregroundStyle(isCurrent ? AnyShapeStyle(style.onColor) : AnyShapeStyle(HierarchicalShapeStyle.primary))
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(isCurrent ? "実行中、" : "")\(style.label)、\(block.name)")
