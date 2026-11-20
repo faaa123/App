@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/block.dart';
 import '../core/logical_day.dart';
 import '../core/stats.dart';
+import '../data/study_controller.dart';
 import 'block_dialogs.dart';
 import 'presets_page.dart';
 import 'study_scope.dart';
@@ -11,11 +12,15 @@ import 'study_scope.dart';
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
 
+  static const _weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+
   @override
   Widget build(BuildContext context) {
     final c = StudyScope.of(context);
     final blocks = c.blocks;
     final text = Theme.of(context).textTheme;
+    final tomorrow = LogicalDay.addDays(c.today, 1);
+    final tomorrowPreset = c.presetForWeekday(LogicalDay.weekdayOf(tomorrow));
 
     void showError(String? err) {
       if (err != null) {
@@ -48,9 +53,21 @@ class SchedulePage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '編集はそのまま翌日以降も引き継がれます。長押しでドラッグして並び替え（時刻は自動で詰め直し）。',
+            '編集は翌日以降も引き継がれます（プリセットを割り当てた曜日は、その日の4:00にプリセットで置き換わります）。',
             style: text.bodySmall,
           ),
+          Text('長押ししてドラッグで並び替え（時刻は自動で詰めます）。', style: text.bodySmall),
+          if (tomorrowPreset != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '明日（${_weekdays[LogicalDay.weekdayOf(tomorrow)]}曜）は'
+                'プリセット「${tomorrowPreset.name}」に切り替わります。',
+                style: text.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
           if (blocks.isEmpty)
             const Padding(
@@ -75,7 +92,7 @@ class SchedulePage extends StatelessWidget {
                     child: _BlockTile(
                       block: blocks[i],
                       onTap: () => showBlockDialog(context, c, editing: blocks[i]),
-                      onDelete: () => c.deleteBlock(blocks[i].id),
+                      onDelete: () => _deleteWithUndo(context, c, blocks[i]),
                     ),
                   ),
               ],
@@ -122,6 +139,33 @@ class SchedulePage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One-tap delete with an undo snackbar (a mis-tap is otherwise permanent).
+Future<void> _deleteWithUndo(
+  BuildContext context,
+  StudyController c,
+  Block removed,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  await c.deleteBlock(removed.id);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text('「${removed.name}」を削除しました'),
+        action: SnackBarAction(
+          label: '元に戻す',
+          onPressed: () async {
+            // Re-validated: the slot may have been filled meanwhile.
+            final err = await c.addBlock(removed);
+            if (err != null) {
+              messenger.showSnackBar(SnackBar(content: Text(err)));
+            }
+          },
+        ),
+      ),
+    );
 }
 
 class _BlockTile extends StatelessWidget {

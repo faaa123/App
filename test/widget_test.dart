@@ -76,4 +76,39 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     study.dispose();
   });
+
+  testWidgets('deleting a block can be undone', (tester) async {
+    final study = StudyController(
+      store: MemoryStudyStore(),
+      chimes: NoopChimeScheduler(),
+      clock: () => DateTime(2026, 11, 20, 8),
+    );
+    await tester.runAsync(study.init);
+    await tester.runAsync(
+      () => study.setBlocks([
+        Block(
+          id: 'a',
+          name: '英語',
+          type: BlockType.study,
+          start: LogicalDay.toOffset(9, 0),
+          end: LogicalDay.toOffset(10, 0),
+        ),
+      ]),
+    );
+    await tester.pumpWidget(App(study: study));
+    await tester.tap(find.text('スケジュール').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('削除'));
+    await tester.pumpAndSettle();
+    expect(study.blocks, isEmpty);
+    expect(find.text('「英語」を削除しました'), findsOneWidget);
+
+    await tester.tap(find.text('元に戻す'));
+    await tester.pump();
+    expect(study.blocks.map((b) => b.name), ['英語']);
+
+    await tester.pumpWidget(const SizedBox());
+    study.dispose();
+  });
 }
