@@ -40,15 +40,60 @@ class DayBand extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Text(LogicalDay.clock(from), style: text),
-            const Spacer(),
-            Text(LogicalDay.clock(to), style: text),
-          ],
+        LayoutBuilder(
+          builder: (context, box) {
+            final small = Theme.of(context).textTheme.labelSmall;
+            final w = box.maxWidth;
+            // Clock labels every 2 or 3 hours, dropped where they would
+            // crowd a neighbour or the start / end labels.
+            final step = (to - from) > 12 * 60 ? 3 : 2;
+            final marks = <(double, int)>[];
+            var last = 0.0;
+            for (final h in _hourOffsets(from, to)) {
+              if (LogicalDay.clockParts(h).$1 % step != 0) continue;
+              final x = (h - from) / (to - from) * w;
+              if (x - last < _minLabelGap || w - x < _minLabelGap) continue;
+              marks.add((x, h));
+              last = x;
+            }
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Row(
+                  children: [
+                    Text(LogicalDay.clock(from), style: text),
+                    const Spacer(),
+                    Text(LogicalDay.clock(to), style: text),
+                  ],
+                ),
+                for (final (x, h) in marks)
+                  Positioned(
+                    left: x,
+                    top: 0,
+                    child: ExcludeSemantics(
+                      child: FractionalTranslation(
+                        translation: const Offset(-0.5, 0),
+                        child: Text(LogicalDay.clock(h), style: small),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );
+  }
+
+  /// Distance kept between label centres (and from the end labels).
+  static const _minLabelGap = 56.0;
+}
+
+/// Offsets of the full hours strictly between [from] and [to]. The logical
+/// day starts at 4:00, so full hours are the multiples of 60.
+Iterable<int> _hourOffsets(int from, int to) sync* {
+  for (var h = (from ~/ 60 + 1) * 60; h < to; h += 60) {
+    yield h;
   }
 }
 
@@ -71,6 +116,13 @@ class _BandPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final span = (to - from).toDouble();
     double x(int o) => (o - from) / span * size.width;
+    // Faint hour ticks behind the blocks.
+    final tick = Paint()
+      ..color = nowColor.withValues(alpha: 0.25)
+      ..strokeWidth = 1;
+    for (final h in _hourOffsets(from, to)) {
+      canvas.drawLine(Offset(x(h), 0), Offset(x(h), size.height), tick);
+    }
     for (final b in blocks) {
       final color = BlockStyle.of(b.type).mark;
       // Shape tells study and rest apart too: rest is drawn half height.

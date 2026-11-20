@@ -5,6 +5,7 @@ import 'package:app/features/study/data/chime_scheduler.dart';
 import 'package:app/features/study/data/study_controller.dart';
 import 'package:app/features/study/data/study_store.dart';
 import 'package:app/features/study/ui/block_dialogs.dart';
+import 'package:app/features/study/ui/day_band.dart';
 import 'package:app/features/study/ui/readable_list.dart';
 import 'package:app/features/study/ui/stats_page.dart';
 import 'package:app/features/study/ui/study_scope.dart';
@@ -249,5 +250,48 @@ void main() {
     final rect = tester.getRect(find.byKey(const Key('c')));
     expect(rect.width, 760);
     expect(rect.left, (1366 - 760) / 2);
+  });
+
+  testWidgets('day band labels hours in between, skipping crowded ones', (
+    tester,
+  ) async {
+    Widget band(double width) => MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: width,
+            child: DayBand(
+              nowOffset: LogicalDay.toOffset(9, 0),
+              blocks: [
+                Block(
+                  id: 'a',
+                  name: '勉強',
+                  type: BlockType.study,
+                  start: LogicalDay.toOffset(8, 0),
+                  end: LogicalDay.toOffset(20, 0),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(band(1200));
+    for (final t in ['8:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00']) {
+      expect(find.text(t), findsOneWidget);
+    }
+    expect(find.text('9:00'), findsNothing);
+
+    // Narrower: every other label would crowd its neighbour.
+    await tester.pumpWidget(band(300));
+    expect(find.text('12:00'), findsOneWidget);
+    expect(find.text('14:00'), findsNothing);
+    expect(find.text('16:00'), findsOneWidget);
+    expect(find.text('18:00'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
