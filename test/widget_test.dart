@@ -202,4 +202,29 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     study.dispose();
   });
+
+  testWidgets('name dialog saves on Return and not when empty', (tester) async {
+    String? result = 'unset';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async => result = await askName(context, title: '名前'),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final save = find.widgetWithText(FilledButton, '保存');
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), '  平日  ');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(result, '平日');
+  });
 }

@@ -373,30 +373,57 @@ Future<bool> confirm(
     ) ??
     false;
 
-Future<String?> askName(BuildContext context, {required String title}) {
-  final c = TextEditingController();
-  return showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: c,
-        autofocus: true,
-        decoration: const InputDecoration(labelText: '名前'),
+Future<String?> askName(BuildContext context, {required String title}) =>
+    showDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(title: title),
+    );
+
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.title});
+
+  final String title;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _c.text.trim();
+    if (v.isNotEmpty) Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      controller: _c,
+      autofocus: true,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _submit(),
+      decoration: const InputDecoration(labelText: '名前'),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('キャンセル'),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final v = c.text.trim();
-            if (v.isNotEmpty) Navigator.pop(context, v);
-          },
+      ValueListenableBuilder(
+        valueListenable: _c,
+        builder: (context, value, _) => FilledButton(
+          onPressed: value.text.trim().isEmpty ? null : _submit,
           child: const Text('保存'),
         ),
-      ],
-    ),
+      ),
+    ],
   );
 }
