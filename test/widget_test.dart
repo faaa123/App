@@ -4,8 +4,9 @@ import 'package:app/features/study/core/logical_day.dart';
 import 'package:app/features/study/data/chime_scheduler.dart';
 import 'package:app/features/study/data/study_controller.dart';
 import 'package:app/features/study/data/study_store.dart';
-import 'package:flutter/widgets.dart';
+import 'package:app/features/study/ui/block_dialogs.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('shell switches between features', (tester) async {
@@ -107,6 +108,57 @@ void main() {
     await tester.tap(find.text('元に戻す'));
     await tester.pump();
     expect(study.blocks.map((b) => b.name), ['英語']);
+
+    await tester.pumpWidget(const SizedBox());
+    study.dispose();
+  });
+
+  testWidgets('an edit dialog left open over 4:00 does not undo the preset', (
+    tester,
+  ) async {
+    var clock = DateTime(2026, 11, 20, 20); // Friday
+    final study = StudyController(
+      store: MemoryStudyStore(),
+      chimes: NoopChimeScheduler(),
+      clock: () => clock,
+    );
+    Block blk(String id, String name, int h) => Block(
+      id: id,
+      name: name,
+      type: BlockType.study,
+      start: LogicalDay.toOffset(h, 0),
+      end: LogicalDay.toOffset(h + 1, 0),
+    );
+    await tester.runAsync(study.init);
+    await tester.runAsync(() => study.setBlocks([blk('s', 'sat', 13)]));
+    await tester.runAsync(() => study.saveAsPreset('weekend'));
+    await tester.runAsync(
+      () => study.setPresetWeekdays(study.presets.single.id, {6}),
+    );
+    await tester.runAsync(() => study.setBlocks([blk('f', 'fri', 9)]));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () =>
+                showBlockDialog(context, study, editing: study.blocks.single),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    clock = DateTime(2026, 11, 21, 4, 1); // Saturday
+    await tester.runAsync(study.refresh);
+    await tester.pump();
+    expect(study.blocks.map((b) => b.name), ['sat']);
+
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(study.blocks.map((b) => b.name), ['sat']);
 
     await tester.pumpWidget(const SizedBox());
     study.dispose();

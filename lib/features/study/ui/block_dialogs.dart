@@ -49,10 +49,16 @@ class _BlockDialogState extends State<_BlockDialog> {
       if (_start >= LogicalDay.minutesPerDay) _start = LogicalDay.minutesPerDay - 30;
       _end = (_start + 30).clamp(_start + 1, LogicalDay.minutesPerDay);
     }
+    // The schedule can change underneath (4:00 rollover, weekday preset):
+    // keep the preview in sync with it.
+    widget.controller.addListener(_onScheduleChanged);
   }
+
+  void _onScheduleChanged() => setState(() {});
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onScheduleChanged);
     _name.dispose();
     super.dispose();
   }
@@ -201,7 +207,14 @@ class _BlockDialogState extends State<_BlockDialog> {
         FilledButton(
           onPressed: result.isOk
               ? () async {
-                  await widget.controller.setBlocks(result.blocks!);
+                  // Recompute against the current schedule, not the one of
+                  // the last build.
+                  final r = _preview();
+                  if (!r.isOk) {
+                    setState(() {});
+                    return;
+                  }
+                  await widget.controller.setBlocks(r.blocks!);
                   if (context.mounted) Navigator.pop(context);
                 }
               : null,
