@@ -150,7 +150,7 @@ private struct Panel: View {
             if let seconds {
                 // Gives up size first in short windows or with large text.
                 Text(Format.countdown(seconds))
-                    .font(.system(size: countdownSize, weight: .semibold, design: .rounded))
+                    .font(.system(size: countdownSize, weight: .medium))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.05)

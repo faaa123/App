@@ -117,7 +117,7 @@ private struct StreakTile: View {
                 .font(.subheadline.weight(.semibold))
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(streak)")
-                        .font(.system(size: numberSize, weight: .semibold, design: .rounded))
+                        .font(.system(size: numberSize, weight: .semibold))
                         .monospacedDigit()
                     Text("日").font(.title2.bold())
                 }

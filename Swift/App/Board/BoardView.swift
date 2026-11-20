@@ -73,7 +73,8 @@ private struct BoardCanvas: UIViewControllerRepresentable {
 ///
 /// Squeeze (Apple Pencil Pro) is left to PKToolPicker: with the "show
 /// contextual palette" setting it shows the palette right at the hovering
-/// pencil tip. The UIPencilInteraction here therefore implements only the tap
+/// pencil tip, but only while the canvas is first responder, so the canvas
+/// takes that as soon as the board appears (`activateCanvas`). The UIPencilInteraction here therefore implements only the tap
 /// callback (a squeeze callback would override that built-in behavior).
 /// PKToolPicker handles double-tap only while it is visible, so we handle it
 /// while it is hidden.
@@ -129,7 +130,25 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        activateCanvas()
+        // SwiftUI may still be settling the tab's view (and its focus) when
+        // this runs, so the first attempt can be refused; try again on the
+        // next turns of the run loop.
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.activateCanvas()
+            try? await Task.sleep(for: .milliseconds(300))
+            self?.activateCanvas()
+        }
+    }
+
+    /// The tool picker (and with it the squeeze palette) only works while the
+    /// canvas is first responder, so take that as soon as the board shows,
+    /// before any stroke.
+    private func activateCanvas() {
+        guard view.window != nil, !canvas.isFirstResponder else { return }
         canvas.becomeFirstResponder()
+        toolPicker.setVisible(false, forFirstResponder: canvas)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -187,13 +206,21 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
             if canvas.tool is PKEraserTool {
                 select(previousTool ?? initialTool)
             } else {
-                select(PKEraserTool(.vector))
+                select(pickerEraser)
             }
         case .switchPrevious:
             select(previousTool ?? initialTool)
         default: // color palette, ink attributes, contextual palette, …
             toggleToolPicker()
         }
+    }
+
+    /// The tool picker's own eraser, as the user set it up there (pixel or
+    /// object eraser, and its width), so double-tap matches tapping the eraser
+    /// in the palette. Pixel eraser if the picker has none.
+    private var pickerEraser: PKTool {
+        toolPicker.toolItems.compactMap { $0 as? PKToolPickerEraserItem }.first?.eraserTool
+            ?? PKEraserTool(.bitmap)
     }
 
     private func select(_ tool: PKTool) {
