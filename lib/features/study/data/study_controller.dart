@@ -45,6 +45,9 @@ class StudyController extends ChangeNotifier {
       '${now().microsecondsSinceEpoch.toRadixString(36)}'
       '${_rand.nextInt(1 << 30).toRadixString(36)}';
 
+  /// Loads the data and rolls over to today; only this is awaited before the
+  /// first frame. Notification setup, saving and chime planning follow in the
+  /// background (the scheduler runs them after its own init).
   Future<void> init() async {
     try {
       final json = await _store.load();
@@ -53,32 +56,51 @@ class StudyController extends ChangeNotifier {
       debugPrint('study data unreadable, starting fresh: $e');
       _data = StudyData();
     }
-    try {
-      await _chimes.init();
-    } catch (e) {
-      debugPrint('chime init failed: $e');
-    }
-    await refresh(force: true);
-    // Catch the 4:00 rollover while the app stays open.
-    _dayTimer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
+    final day = today;
+    _currentDay = day;
+    final changed = _rollOver(day);
+    _armDayTimer();
+    unawaited(
+      _chimes.init().catchError((Object e) {
+        debugPrint('chime init failed: $e');
+      }),
+    );
+    if (changed) unawaited(_save().catchError(_logSaveError));
+    unawaited(_replanChimes());
   }
+
+  bool _disposed = false;
 
   @override
   void dispose() {
+    _disposed = true;
     _dayTimer?.cancel();
     super.dispose();
   }
 
-  /// Call on start, on resume and periodically. Finalizes past days, applies
+  /// Fires just after the next 4:00 so the new day shows without delay.
+  void _armDayTimer() {
+    _dayTimer?.cancel();
+    if (_disposed) return;
+    final next = LogicalDay.toDateTime(LogicalDay.addDays(today, 1), 0);
+    final wait = next.difference(now()) + const Duration(seconds: 1);
+    _dayTimer = Timer(wait.isNegative ? Duration.zero : wait, () async {
+      await refresh();
+      _armDayTimer();
+    });
+  }
+
+  /// Call on resume (and from the 4:00 timer). Finalizes past days, applies
   /// today's weekday preset and re-plans chimes when the logical day changed.
   Future<void> refresh({bool force = false}) async {
     final day = today;
     if (!force && day == _currentDay) return;
     _currentDay = day;
-    _rollOver(day);
-    await _save();
-    await _replanChimes();
+    final changed = _rollOver(day);
+    _armDayTimer();
     notifyListeners();
+    unawaited(_replanChimes());
+    if (changed) await _save();
   }
 
   // ---------------------------------------------------------------- schedule
@@ -126,7 +148,9 @@ class StudyController extends ChangeNotifier {
         updatedAt: now(),
       ),
     );
-    await _commit();
+    // A new preset has no weekdays, so the chime plan is unchanged.
+    notifyListeners();
+    await _save();
   }
 
   Future<void> applyPreset(String id) async {
@@ -163,8 +187,8 @@ class StudyController extends ChangeNotifier {
 
   Future<void> setThreshold(int minutes) async {
     _data.threshold = max(10, minutes);
-    await _save();
     notifyListeners();
+    await _save();
   }
 
   /// Planned study minutes per logical date, including today (live).
@@ -247,13 +271,16 @@ class StudyController extends ChangeNotifier {
     return advanced || _data.summaries.length != before;
   }
 
+  /// The in-memory data is already updated: show it first, then persist.
   Future<void> _commit() async {
-    await _save();
-    await _replanChimes();
     notifyListeners();
+    unawaited(_replanChimes());
+    await _save();
   }
 
   Future<void> _save() => _store.save(_data.toJson());
+
+  static void _logSaveError(Object e) => debugPrint('study save failed: $e');
 
   Future<void> _replanChimes() => _chimes.replaceAll(
     planChimes(now: now(), days: _chimeDays, scheduleFor: scheduleFor),

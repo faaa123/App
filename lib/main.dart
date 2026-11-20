@@ -14,6 +14,7 @@ Future<void> main() async {
         ? NotificationChimeScheduler()
         : NoopChimeScheduler(),
   );
+  // Only loads the JSON; notifications and chimes are set up after runApp.
   await study.init();
   runApp(App(study: study));
 }

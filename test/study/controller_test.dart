@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/features/study/core/block.dart';
 import 'package:app/features/study/core/chime_plan.dart';
 import 'package:app/features/study/core/logical_day.dart';
@@ -163,6 +165,17 @@ void main() {
     c.dispose();
   });
 
+  test('init does not wait for notification permission', () async {
+    final c = StudyController(
+      store: store,
+      chimes: _NeverReadyChimes(),
+      clock: () => clock,
+    );
+    await c.init();
+    expect(await c.addBlock(blk(c, 'a', BlockType.study, o(9, 0), o(10, 0))), isNull);
+    c.dispose();
+  });
+
   test('chime init failure does not block init', () async {
     final c = StudyController(
       store: store,
@@ -173,6 +186,13 @@ void main() {
     expect(c.blocks, isEmpty);
     c.dispose();
   });
+}
+
+class _NeverReadyChimes implements ChimeScheduler {
+  @override
+  Future<void> init() => Completer<void>().future;
+  @override
+  Future<void> replaceAll(List<Chime> chimes) async {}
 }
 
 class _ThrowingChimes implements ChimeScheduler {
