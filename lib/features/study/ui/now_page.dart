@@ -240,8 +240,10 @@ class _Panel extends StatelessWidget {
                   ],
                 ),
                 // The countdown gives up height first in short windows or
-                // with large text.
-                if (seconds != null)
+                // with large text. Its base size fills a large iPad; the
+                // FittedBox shrinks it in Split View and portrait.
+                if (seconds != null) ...[
+                  const SizedBox(height: 8),
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
@@ -251,7 +253,7 @@ class _Panel extends StatelessWidget {
                         semanticsLabel: 'あと${formatUntil(seconds!)}',
                         style: TextStyle(
                           color: onColor,
-                          fontSize: 160,
+                          fontSize: 300,
                           fontWeight: FontWeight.w600,
                           fontFeatures: const [FontFeature.tabularFigures()],
                           height: 1.2,
@@ -259,6 +261,8 @@ class _Panel extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                ],
                 if (caption != null)
                   Text(
                     caption!,
