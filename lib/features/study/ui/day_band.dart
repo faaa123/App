@@ -6,7 +6,7 @@ import '../core/logical_day.dart';
 import 'study_scope.dart';
 
 /// Today's blocks as one horizontal band: past = filled, current = partly
-/// filled, future = outlined, free time = empty gap. [blocks] must be sorted
+/// filled, future = outlined, free time = empty gap, rest = half height. [blocks] must be sorted
 /// by start (as `StudyController.blocks` is).
 class DayBand extends StatelessWidget {
   const DayBand({super.key, required this.blocks, required this.nowOffset});
@@ -68,7 +68,11 @@ class _BandPainter extends CustomPainter {
     double x(int o) => (o - from) / span * size.width;
     for (final b in blocks) {
       final color = BlockStyle.of(b.type).color;
-      final rect = Rect.fromLTRB(x(b.start) + 1, 0, x(b.end) - 1, size.height);
+      // Shape tells study and rest apart too: rest is drawn half height.
+      final rest = b.type == BlockType.rest;
+      final top = rest ? size.height * 0.25 : 0.0;
+      final bottom = rest ? size.height * 0.75 : size.height;
+      final rect = Rect.fromLTRB(x(b.start) + 1, top, x(b.end) - 1, bottom);
       final r = RRect.fromRectAndRadius(rect, const Radius.circular(6));
       // Future part: faint fill + outline.
       canvas.drawRRect(r, Paint()..color = color.withValues(alpha: 0.18));
@@ -83,7 +87,7 @@ class _BandPainter extends CustomPainter {
       final doneEnd = now >= b.end ? b.end : (now > b.start ? now : b.start);
       if (doneEnd > b.start) {
         canvas.save();
-        canvas.clipRect(Rect.fromLTRB(0, 0, x(doneEnd), size.height));
+        canvas.clipRect(Rect.fromLTRB(0, top, x(doneEnd), bottom));
         canvas.drawRRect(r, Paint()..color = color);
         canvas.restore();
       }
