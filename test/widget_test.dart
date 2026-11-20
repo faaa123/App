@@ -69,6 +69,10 @@ void main() {
     expect(find.text('勉強　数学の過去問演習'), findsOneWidget);
     expect(find.text('次：休憩・このあとすぐ'), findsOneWidget);
 
+    await tester.tap(find.text('統計'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
     await tester.pumpWidget(const SizedBox());
     study.dispose();
   });

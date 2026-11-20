@@ -36,14 +36,23 @@ class StatsPage extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Row(
+            // Wraps the stepper below the streak in narrow windows.
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              runSpacing: 12,
               children: [
-                const Icon(Icons.local_fire_department, size: 48),
-                const SizedBox(width: 16),
-                Text('${c.streak()}', style: text.displayMedium),
-                const SizedBox(width: 8),
-                Text('日連続', style: text.titleLarge),
-                const Spacer(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department, size: 48),
+                    const SizedBox(width: 16),
+                    Text('${c.streak()}', style: text.displayMedium),
+                    const SizedBox(width: 8),
+                    Text('日連続', style: text.titleLarge),
+                  ],
+                ),
                 MinuteStepper(
                   label: '達成の基準（1日）',
                   value: c.threshold,
@@ -88,10 +97,13 @@ class _PeriodCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              runSpacing: 4,
               children: [
                 Text(title, style: text.titleLarge),
-                const Spacer(),
                 Text('合計 ${formatMinutes(total)}　平均 ${formatMinutes(total ~/ days.length)}'),
               ],
             ),
