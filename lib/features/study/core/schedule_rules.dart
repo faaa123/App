@@ -6,11 +6,14 @@ String? validateSchedule(List<Block> blocks) {
   final s = sortedByStart(blocks);
   for (var i = 0; i < s.length - 1; i++) {
     if (s[i].end > s[i + 1].start) {
-      return '「${s[i].name}」と「${s[i + 1].name}」の時間が重複しています';
+      final a = s[i], b = s[i + 1];
+      return '「${a.name}」(${_range(a)})と「${b.name}」(${_range(b)})の時間が重なっています';
     }
   }
   return null;
 }
+
+String _range(Block b) => '${LogicalDay.clock(b.start)}–${LogicalDay.clock(b.end)}';
 
 /// Result of an edit: the whole new schedule, or an error.
 class EditResult {
@@ -21,7 +24,7 @@ class EditResult {
   bool get isOk => blocks != null;
 }
 
-String _rangeError(String name) => '「$name」が論理日の終端（翌4:00）を越えるか、不正な時刻です';
+String _rangeError(String name) => '「$name」が1日の区切り（翌朝4:00）を越えるか、不正な時刻です';
 
 bool _validRange(int s, int e) =>
     s >= 0 && e <= LogicalDay.minutesPerDay && e > s;
@@ -71,7 +74,7 @@ EditResult applyCascadeShift(
       e += shift;
     }
     if (!_validRange(s, e)) {
-      return EditResult.fail('「${b.name}」が論理日の終端（翌4:00）を越えるか、開始前になります');
+      return EditResult.fail('「${b.name}」が1日の区切り（翌朝4:00）を越えるか、開始前になります');
     }
     updated.add(b.copyWith(start: s, end: e));
   }

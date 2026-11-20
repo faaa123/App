@@ -133,7 +133,7 @@ class StudyController extends ChangeNotifier {
   /// Returns an error message or null.
   Future<String?> reorder(List<String> newOrder) async {
     final r = reorderSchedule(_data.blocks, newOrder);
-    if (r == null) return '並び替えると論理日の終端（翌4:00）を越えます';
+    if (r == null) return '並び替えると1日の区切り（翌朝4:00）を越えます';
     await setBlocks(r);
     return null;
   }

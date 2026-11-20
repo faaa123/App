@@ -129,6 +129,21 @@ void main() {
     });
   });
 
+  group('messages', () {
+    test('overlap names both blocks with their times', () {
+      expect(
+        validateSchedule([study('勉強', o(9, 0), o(10, 0)), study('勉強', o(9, 30), o(11, 0))]),
+        '「勉強」(9:00–10:00)と「勉強」(9:30–11:00)の時間が重なっています',
+      );
+    });
+    test('day end is described without the internal term', () {
+      final r = applySingleChange([study('a', o(9, 0), o(10, 0))], 'a', o(9, 0), LogicalDay.minutesPerDay + 1);
+      expect(r.isOk, isFalse);
+      expect(r.error, isNot(contains('論理日')));
+      expect(r.error, contains('1日の区切り（翌朝4:00）'));
+    });
+  });
+
   group('reorder', () {
     // Total length (durations + fixed gaps) never changes, so the end of the
     // day is preserved; reorderSchedule's null path is only a safety net.
