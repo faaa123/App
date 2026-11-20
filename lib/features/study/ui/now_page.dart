@@ -18,17 +18,38 @@ class NowPage extends StatefulWidget {
 
 class _NowPageState extends State<NowPage> {
   Timer? _ticker;
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     // Only this page ticks; other features stay idle (no frames).
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _schedule();
+    _lifecycle = AppLifecycleListener(
+      onHide: () => _ticker?.cancel(),
+      onShow: () {
+        setState(() {});
+        _schedule();
+      },
+    );
+  }
+
+  /// Ticks just after each wall-clock second, so the countdown changes in
+  /// step with the clock (and the chimes) instead of up to 1s late.
+  void _schedule() {
+    _ticker?.cancel();
+    final n = DateTime.now();
+    _ticker = Timer(Duration(milliseconds: 1000 - n.millisecond + 5), () {
+      if (!mounted) return;
+      setState(() {});
+      _schedule();
+    });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _lifecycle.dispose();
     super.dispose();
   }
 
