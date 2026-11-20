@@ -124,6 +124,26 @@ void main() {
     return c;
   }
 
+  test('resuming after several days replays presets in between', () async {
+    clock = DateTime(2026, 11, 19, 8); // Thursday
+    final c = make();
+    await c.init();
+    await c.setBlocks([blk(c, 'sat', BlockType.study, o(13, 0), o(14, 0))]);
+    await c.saveAsPreset('weekend');
+    await c.setPresetWeekdays(c.presets.single.id, {6}); // Saturday
+    await c.setBlocks([blk(c, 'normal', BlockType.study, o(9, 0), o(10, 30))]);
+
+    clock = DateTime(2026, 11, 23, 8); // the following Monday
+    await c.refresh();
+    final m = c.minutesByDate();
+    expect(m['2026-11-19'], 90);
+    expect(m['2026-11-20'], 90);
+    expect(m['2026-11-21'], 60);
+    expect(m['2026-11-22'], 60); // Saturday's schedule carries over
+    expect(c.blocks.map((b) => b.name), ['sat']);
+    c.dispose();
+  });
+
   test('edits on a preset day carry over and are recorded', () async {
     final c = await withSaturdayPreset();
     clock = DateTime(2026, 11, 21, 8); // Saturday

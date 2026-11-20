@@ -144,6 +144,15 @@ void main() {
       expect((m['a']!.start, m['a']!.end), (40, 100));
       expect((m['b']!.start, m['b']!.end), (100, 110));
     });
+    test('returns null instead of passing 4:00', () {
+      // Only reachable with overlapping input (a negative gap).
+      final blocks = [
+        study('a', 0, 10),
+        study('b', 100, 1440),
+        rest('c', 200, 300),
+      ];
+      expect(reorderSchedule(blocks, ['b', 'c', 'a']), isNull);
+    });
   });
 
   group('pomodoro', () {
@@ -230,6 +239,19 @@ void main() {
         DateTime(2026, 1, 2, 10, 0),
         DateTime(2026, 1, 3, 10, 0),
       ]);
+    });
+    test('at 4:00 between days only when the type changes', () {
+      List<Chime> plan(BlockType nextType) => planChimes(
+        now: DateTime(2026, 1, 1, 8, 0),
+        days: 2,
+        scheduleFor: (d) => d.day == 1
+            ? [rest('late', o(3, 0), LogicalDay.minutesPerDay)]
+            : [b('early', nextType, 0, 60)],
+      );
+      final switched = plan(BlockType.study);
+      expect([for (final c in switched) c.at], [DateTime(2026, 1, 2, 4, 0)]);
+      expect(switched.single.next.id, 'early');
+      expect(plan(BlockType.rest), isEmpty);
     });
   });
 }
