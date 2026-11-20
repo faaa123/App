@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pencil_canvas/pencil_canvas.dart';
 
@@ -10,6 +11,9 @@ class WhiteboardPage extends StatelessWidget {
   const WhiteboardPage({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      PencilCanvas(onMenu: ShellScope.maybeOf(context)?.toggleNavigation);
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    // Dark status bar text on the white canvas.
+    value: SystemUiOverlayStyle.dark,
+    child: PencilCanvas(onMenu: ShellScope.maybeOf(context)?.toggleNavigation),
+  );
 }
