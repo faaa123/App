@@ -24,6 +24,8 @@ class PencilCanvasController {
 /// Apple Pencil draws, fingers pan and pinch-zoom. Squeezing Apple Pencil Pro
 /// toggles the tool picker. Tool / undo / clear buttons are drawn natively on
 /// top of the canvas so no Flutter overlay sits above it. Nothing is saved.
+/// With the system squeeze setting "contextual palette", PencilKit shows the
+/// tool palette at the hovering pencil tip.
 ///
 /// On other platforms a placeholder is shown.
 class PencilCanvas extends StatelessWidget {

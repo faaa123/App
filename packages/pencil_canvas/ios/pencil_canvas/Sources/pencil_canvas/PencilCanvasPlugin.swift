@@ -30,8 +30,12 @@ final class PencilCanvasViewFactory: NSObject, FlutterPlatformViewFactory {
 }
 
 /// Temporary whiteboard. Apple Pencil draws, fingers pan/zoom. Nothing is persisted.
-/// Squeezing Apple Pencil Pro (or tapping the tools button) toggles the system tool picker.
-final class PencilCanvasPlatformView: NSObject, FlutterPlatformView, UIPencilInteractionDelegate {
+///
+/// Squeeze (Apple Pencil Pro) and double-tap are handled by PKToolPicker itself:
+/// with the "show contextual palette" setting, squeezing shows the tool palette
+/// right at the hovering pencil tip. We deliberately install no UIPencilInteraction
+/// of our own, because a custom squeeze handler would override that built-in behavior.
+final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
   /// Board size relative to the visible area.
   private static let boardScale: CGFloat = 3
 
@@ -39,7 +43,7 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView, UIPencilInt
   private let canvas = PKCanvasView()
   private let toolPicker = PKToolPicker()
   private let channel: FlutterMethodChannel
-  private var lastInkingTool: PKTool = PKInkingTool(.pen, color: .black, width: 3)
+  private let initialTool = PKInkingTool(.pen, color: .black, width: 3)
 
   init(frame: CGRect, viewId: Int64, messenger: FlutterBinaryMessenger) {
     container = BoardContainerView(frame: frame)
@@ -47,7 +51,7 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView, UIPencilInt
     super.init()
 
     canvas.drawingPolicy = .pencilOnly
-    canvas.tool = lastInkingTool
+    canvas.tool = initialTool
     canvas.backgroundColor = .white
     canvas.overrideUserInterfaceStyle = .light  // black ink on white even in dark mode
     canvas.isOpaque = true
@@ -62,13 +66,10 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView, UIPencilInt
     container.onFirstLayout = { [weak self] size in self?.setUpBoard(viewSize: size) }
 
     toolPicker.colorUserInterfaceStyle = .light
-    toolPicker.selectedTool = lastInkingTool
+    toolPicker.selectedTool = initialTool
     toolPicker.addObserver(canvas)
+    // Associate the picker with the canvas (hidden until squeezed / tools button).
     toolPicker.setVisible(false, forFirstResponder: canvas)
-
-    let pencil = UIPencilInteraction()
-    pencil.delegate = self
-    container.addInteraction(pencil)
 
     addButtons()
 
@@ -113,30 +114,6 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView, UIPencilInt
   private func toggleToolPicker() {
     canvas.becomeFirstResponder()
     toolPicker.setVisible(!toolPicker.isVisible, forFirstResponder: canvas)
-  }
-
-  private func toggleEraser() {
-    if canvas.tool is PKEraserTool {
-      canvas.tool = lastInkingTool
-    } else {
-      lastInkingTool = canvas.tool
-      canvas.tool = PKEraserTool(.vector)
-    }
-    toolPicker.selectedTool = canvas.tool
-  }
-
-  // MARK: - Apple Pencil
-
-  @available(iOS 17.5, *)
-  func pencilInteraction(
-    _ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze
-  ) {
-    guard squeeze.phase == .ended else { return }
-    switch UIPencilInteraction.preferredSqueezeAction {
-    case .ignore: break
-    case .switchEraser, .switchPrevious: toggleEraser()
-    default: toggleToolPicker()  // .showContextualPalette etc.
-    }
   }
 
   // MARK: - Native buttons (avoid Flutter overlays above the canvas)
