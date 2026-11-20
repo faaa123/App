@@ -50,13 +50,16 @@ class _NowPageState extends State<NowPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          // Wraps instead of overflowing in Split View.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 16,
+            runSpacing: 4,
             children: [
               Text(_dateLabel(c.today), style: text.titleMedium),
-              const Spacer(),
               if (blocks.isNotEmpty)
                 Text(
-                  '本日の勉強 ${formatMinutes(elapsedStudyMinutes(blocks, offset))}'
+                  '勉強 ${formatMinutes(elapsedStudyMinutes(blocks, offset))}'
                   ' / ${formatMinutes(totalStudyMinutes(blocks))}',
                   style: text.titleMedium,
                 ),
@@ -178,67 +181,82 @@ class _Panel extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(28),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: DefaultTextStyle.merge(
-          style: TextStyle(color: onColor),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: onColor, size: 40),
-                  const SizedBox(width: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Padding(
+          padding: EdgeInsets.all(constraints.maxHeight < 500 ? 20 : 40),
+          child: DefaultTextStyle.merge(
+            style: TextStyle(color: onColor),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: onColor, size: 40),
+                    const SizedBox(width: 16),
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: text.headlineMedium?.copyWith(color: onColor),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                // The countdown gives up height first in short windows or
+                // with large text.
+                if (big != null)
                   Flexible(
-                    child: Text(
-                      title,
-                      style: text.headlineMedium?.copyWith(color: onColor),
-                      overflow: TextOverflow.ellipsis,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        big!,
+                        style: TextStyle(
+                          color: onColor,
+                          fontSize: 160,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (caption != null)
+                  Text(
+                    caption!,
+                    style: text.titleLarge?.copyWith(color: onColor),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (progress != null) ...[
+                  const SizedBox(height: 24),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 12,
+                      color: onColor,
+                      backgroundColor: onColor.withValues(alpha: 0.2),
                     ),
                   ),
                 ],
-              ),
-              if (big != null)
-                FittedBox(
-                  child: Text(
-                    big!,
-                    style: TextStyle(
-                      color: onColor,
-                      fontSize: 160,
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      height: 1.2,
-                    ),
+                if (footer != null) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    footer!,
+                    style: text.titleMedium?.copyWith(color: onColor),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              if (caption != null)
-                Text(
-                  caption!,
-                  style: text.titleLarge?.copyWith(color: onColor),
-                  textAlign: TextAlign.center,
-                ),
-              if (progress != null) ...[
-                const SizedBox(height: 24),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 12,
-                    color: onColor,
-                    backgroundColor: onColor.withValues(alpha: 0.2),
-                  ),
-                ),
+                ],
               ],
-              if (footer != null) ...[
-                const SizedBox(height: 24),
-                Text(footer!, style: text.titleMedium?.copyWith(color: onColor)),
-              ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

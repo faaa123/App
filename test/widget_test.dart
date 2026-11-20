@@ -1,4 +1,6 @@
 import 'package:app/app/app.dart';
+import 'package:app/features/study/core/block.dart';
+import 'package:app/features/study/core/logical_day.dart';
 import 'package:app/features/study/data/chime_scheduler.dart';
 import 'package:app/features/study/data/study_controller.dart';
 import 'package:app/features/study/data/study_store.dart';
@@ -29,6 +31,41 @@ void main() {
     await tester.pumpAndSettle();
     // Test host is not iOS, so the canvas shows its placeholder.
     expect(find.text('この機能は iPad でのみ利用できます'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    study.dispose();
+  });
+
+  testWidgets('now page fits a narrow, short Split View window', (tester) async {
+    tester.view.physicalSize = const Size(590, 420);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final study = StudyController(
+      store: MemoryStudyStore(),
+      chimes: NoopChimeScheduler(),
+      clock: () => DateTime(2026, 11, 20, 12, 10),
+    );
+    await tester.runAsync(study.init);
+    await tester.runAsync(
+      () => study.setBlocks([
+        Block(
+          id: 'a',
+          name: '数学の過去問演習',
+          type: BlockType.study,
+          start: LogicalDay.toOffset(12, 0),
+          end: LogicalDay.toOffset(13, 30),
+        ),
+        Block(
+          id: 'b',
+          name: '休憩',
+          type: BlockType.rest,
+          start: LogicalDay.toOffset(13, 30),
+          end: LogicalDay.toOffset(13, 45),
+        ),
+      ]),
+    );
+    await tester.pumpWidget(App(study: study));
+    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox());
     study.dispose();
