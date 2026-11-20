@@ -56,4 +56,13 @@ struct AppTests {
             #expect(render(view.environment(study), width: 600, height: 800) != nil)
         }
     }
+
+    @Test func statsRendersAndListsDaysOldestFirst() {
+        let study = makeStudy([Block(id: "a", name: "勉強", type: .study, start: 300, end: 400)])
+        #expect(render(NavigationStack { StatsView() }.environment(study), width: 400, height: 900) != nil)
+        let days = StatsView.lastDays(7, today: study.today, byDate: study.minutesByDate())
+        #expect(days.count == 7)
+        #expect(days.last?.date == study.today)
+        #expect(days.last?.minutes == 100)
+    }
 }

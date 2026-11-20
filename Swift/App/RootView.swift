@@ -23,8 +23,7 @@ struct RootView: View {
             }
             Tab("統計", systemImage: "chart.bar", value: AppTab.stats) {
                 NavigationStack {
-                    Text("統計")
-                        .navigationTitle("統計")
+                    StatsView()
                 }
             }
             Tab("ボード", systemImage: "pencil.tip", value: AppTab.board) {
