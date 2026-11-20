@@ -26,6 +26,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('ブロックを追加'), findsOneWidget);
 
+    // Presets open inside the feature area; the rail stays visible.
+    await tester.tap(find.text('プリセット'));
+    await tester.pumpAndSettle();
+    expect(find.text('現在のスケジュールを保存'), findsOneWidget);
+    expect(find.byType(NavigationRail), findsOneWidget);
+
     await tester.tap(find.text('統計'));
     await tester.pumpAndSettle();
     expect(find.text('直近7日'), findsOneWidget);

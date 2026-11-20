@@ -31,6 +31,10 @@ const appFeatures = <AppFeature>[
 ];
 
 Widget _now(BuildContext context) => const NowPage();
-Widget _schedule(BuildContext context) => const SchedulePage();
+// Own navigator so the presets page opens beside the rail, not over it.
+Widget _schedule(BuildContext context) => Navigator(
+  onGenerateRoute: (_) =>
+      MaterialPageRoute<void>(builder: (_) => const SchedulePage()),
+);
 Widget _stats(BuildContext context) => const StatsPage();
 Widget _whiteboard(BuildContext context) => const WhiteboardPage();
