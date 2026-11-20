@@ -123,7 +123,7 @@ class _StatusPanel extends StatelessWidget {
         onColor: scheme.onSurface,
         icon: Icons.hourglass_empty,
         title: '予定なし',
-        big: formatCountdown(s.secondsUntilNext),
+        seconds: s.secondsUntilNext,
         caption: '「${s.next.name}」が始まるまで',
       ),
       DayEnded(:final secondsUntilTomorrowFirst) =>
@@ -140,7 +140,7 @@ class _StatusPanel extends StatelessWidget {
                 onColor: scheme.onSurface,
                 icon: Icons.nights_stay_outlined,
                 title: hasToday ? '本日の予定は終了' : '本日は予定なし',
-                big: formatCountdown(secondsUntilTomorrowFirst),
+                seconds: secondsUntilTomorrowFirst,
                 caption: '明日の最初のブロックまで',
               ),
     };
@@ -158,7 +158,9 @@ class _InBlockPanel extends StatelessWidget {
     final style = BlockStyle.of(b.type);
     final next = status.next;
     // Default names equal the type label; don't show them twice.
-    final title = b.name == style.label ? style.label : '${style.label}　${b.name}';
+    final title = b.name == style.label
+        ? style.label
+        : '${style.label}　${b.name}';
     final String? nextName;
     if (next == null) {
       nextName = null;
@@ -171,7 +173,7 @@ class _InBlockPanel extends StatelessWidget {
       onColor: style.onColor,
       icon: style.icon,
       title: title,
-      big: formatCountdown(status.remainingSeconds),
+      seconds: status.remainingSeconds,
       caption: '〜${LogicalDay.clock(b.end)}',
       progress: status.progress,
       footer: next == null
@@ -189,7 +191,7 @@ class _Panel extends StatelessWidget {
     required this.onColor,
     required this.icon,
     required this.title,
-    this.big,
+    this.seconds,
     this.caption,
     this.progress,
     this.footer,
@@ -199,7 +201,9 @@ class _Panel extends StatelessWidget {
   final Color onColor;
   final IconData icon;
   final String title;
-  final String? big;
+
+  /// Countdown shown as the hero number.
+  final int? seconds;
   final String? caption;
   final double? progress;
   final String? footer;
@@ -237,12 +241,14 @@ class _Panel extends StatelessWidget {
                 ),
                 // The countdown gives up height first in short windows or
                 // with large text.
-                if (big != null)
+                if (seconds != null)
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
+                      // VoiceOver reads "あと25分" instead of a bare "25:00".
                       child: Text(
-                        big!,
+                        formatCountdown(seconds!),
+                        semanticsLabel: 'あと${formatUntil(seconds!)}',
                         style: TextStyle(
                           color: onColor,
                           fontSize: 160,

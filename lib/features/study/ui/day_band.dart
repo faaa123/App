@@ -22,15 +22,20 @@ class DayBand extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 40,
-          child: CustomPaint(
-            painter: _BandPainter(
-              blocks: s,
-              from: from,
-              to: to,
-              now: nowOffset,
-              nowColor: Theme.of(context).colorScheme.onSurface,
+        Semantics(
+          label:
+              '本日 ${LogicalDay.clock(from)}〜${LogicalDay.clock(to)}、'
+              '${s.length}ブロック',
+          child: SizedBox(
+            height: 40,
+            child: CustomPaint(
+              painter: _BandPainter(
+                blocks: s,
+                from: from,
+                to: to,
+                now: nowOffset,
+                nowColor: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ),

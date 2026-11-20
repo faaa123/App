@@ -89,18 +89,21 @@ class MinuteStepper extends StatelessWidget {
         Text(label),
         IconButton(
           icon: const Icon(Icons.remove),
+          tooltip: '$labelを$step分減らす',
           onPressed: value - step >= min ? () => onChanged(value - step) : null,
         ),
         SizedBox(
           width: 56,
           child: Text(
             '$value分',
+            semanticsLabel: '$label $value分',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
         IconButton(
           icon: const Icon(Icons.add),
+          tooltip: '$labelを$step分増やす',
           onPressed: value + step <= max ? () => onChanged(value + step) : null,
         ),
       ],
