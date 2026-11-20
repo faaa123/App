@@ -41,23 +41,25 @@ struct ScheduleView: View {
                 } else {
                     let nowOffset = LogicalDay.offset(of: study.now().local)
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { i, b in
-                        BlockRow(block: b,
-                                 gapBefore: i > 0 ? b.start - blocks[i - 1].end : 0,
-                                 isCurrent: b.contains(nowOffset))
-                            .contentShape(.rect)
-                            .onTapGesture { editing = .block(b) }
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityHint("編集します")
-                            .accessibilityAction(named: "前へ移動") { move(from: i, to: i - 1) }
-                            .accessibilityAction(named: "後ろへ移動") { move(from: i, to: i + 2) }
-                            .accessibilityAction(named: "削除") { delete(b) }
-                            .swipeActions {
-                                Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
-                            }
-                            .contextMenu {
-                                Button("編集", systemImage: "pencil") { editing = .block(b) }
-                                Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
-                            }
+                        // A real button: works with VoiceOver, Full Keyboard
+                        // Access and pointer hover, not only touch.
+                        Button { editing = .block(b) } label: {
+                            BlockRow(block: b,
+                                     gapBefore: i > 0 ? b.start - blocks[i - 1].end : 0,
+                                     isCurrent: b.contains(nowOffset))
+                        }
+                        .tint(.primary)
+                        .accessibilityHint("編集します")
+                        .accessibilityAction(named: "前へ移動") { move(from: i, to: i - 1) }
+                        .accessibilityAction(named: "後ろへ移動") { move(from: i, to: i + 2) }
+                        .accessibilityAction(named: "削除") { delete(b) }
+                        .swipeActions {
+                            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
+                        }
+                        .contextMenu {
+                            Button("編集", systemImage: "pencil") { editing = .block(b) }
+                            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
+                        }
                     }
                     .onMove { from, to in
                         guard let i = from.first else { return }
