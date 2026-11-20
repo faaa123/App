@@ -18,8 +18,7 @@ struct RootView: View {
             }
             Tab("スケジュール", systemImage: "list.bullet", value: AppTab.schedule) {
                 NavigationStack {
-                    Text("スケジュール")
-                        .navigationTitle("スケジュール")
+                    ScheduleView()
                 }
             }
             Tab("統計", systemImage: "chart.bar", value: AppTab.stats) {
