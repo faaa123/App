@@ -98,6 +98,8 @@ private struct PeriodCard: View {
     let days: [DayMinutes]
     let threshold: Int
     let showsValues: Bool
+    /// The day under the finger or pointer (Swift Charts selection).
+    @State private var selectedKey: String?
 
     var body: some View {
         let total = days.reduce(0) { $0 + $1.minutes }
@@ -110,6 +112,7 @@ private struct PeriodCard: View {
                 }
                 chart
                     .frame(height: 200)
+                    .chartXSelection(value: $selectedKey)
             }
         }
     }
@@ -149,6 +152,24 @@ private struct PeriodCard: View {
                 }
                 .accessibilityLabel("\(d.date.month)月\(d.date.day)日\(d.isToday ? "（今日）" : "")")
                 .accessibilityValue("\(Format.minutes(d.minutes))\(ok ? "、達成" : "")")
+            }
+            if let key = selectedKey, let d = days.first(where: { $0.id == key }) {
+                // Callout for the selected day (touch, drag or hover).
+                RuleMark(x: .value("日付", key))
+                    .foregroundStyle(.tertiary)
+                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        VStack(spacing: 2) {
+                            Text("\(d.date.month)月\(d.date.day)日（\(Format.weekdayLabels[d.date.weekday])）")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(Format.minutes(d.minutes))
+                                .font(.headline.monospacedDigit())
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                    }
+                    .accessibilityHidden(true)
             }
             RuleMark(y: .value("基準", threshold))
                 .foregroundStyle(.secondary)
