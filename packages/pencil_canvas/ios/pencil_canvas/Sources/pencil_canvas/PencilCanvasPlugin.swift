@@ -1,6 +1,7 @@
 import Flutter
 import PencilKit
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 
 public class PencilCanvasPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -155,9 +156,24 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
   }
 }
 
-/// Reports its first non-zero size so the board can be sized to the view.
+/// Hosts the canvas. Reports its first non-zero size, and stops Flutter from
+/// mirroring every pencil sample into Dart.
 final class BoardContainerView: UIView {
   var onFirstLayout: ((CGSize) -> Void)?
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    // Passive recognizer: re-applies the forwarding cut at each touch start in case
+    // Flutter recreated its recognizer. Never recognizes, never delays touches.
+    addGestureRecognizer(TouchStartObserver { [weak self] in self?.stopFlutterTouchForwarding() })
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  override func didMoveToSuperview() {
+    super.didMoveToSuperview()
+    stopFlutterTouchForwarding()
+  }
 
   override func layoutSubviews() {
     super.layoutSubviews()
@@ -165,4 +181,42 @@ final class BoardContainerView: UIView {
     onFirstLayout = nil
     callback(bounds.size)
   }
+
+  /// Flutter wraps platform views in a view whose "ForwardingGestureRecognizer"
+  /// re-sends every touch (up to 240 Hz for Apple Pencil) to the Dart side, on the
+  /// main thread PencilKit also uses. No Flutter widget lives inside the board, so
+  /// that work is pure overhead: disable it. Matching by class name is deliberate;
+  /// if Flutter renames it, this silently does nothing and the board still works.
+  private func stopFlutterTouchForwarding() {
+    guard let host = superview else { return }
+    for recognizer in host.gestureRecognizers ?? []
+    where recognizer.isEnabled
+      && NSStringFromClass(type(of: recognizer)).contains("ForwardingGestureRecognizer")
+    {
+      recognizer.isEnabled = false
+    }
+  }
+}
+
+private final class TouchStartObserver: UIGestureRecognizer, UIGestureRecognizerDelegate {
+  private let onTouchStart: () -> Void
+
+  init(onTouchStart: @escaping () -> Void) {
+    self.onTouchStart = onTouchStart
+    super.init(target: nil, action: nil)
+    cancelsTouchesInView = false
+    delaysTouchesBegan = false
+    delaysTouchesEnded = false
+    delegate = self
+  }
+
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+    onTouchStart()
+    state = .failed
+  }
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+  ) -> Bool { true }
 }
