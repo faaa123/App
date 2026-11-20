@@ -99,10 +99,16 @@ class StudyController extends ChangeNotifier {
   }
 
   /// Call on resume (and from the 4:00 timer). Finalizes past days, applies
-  /// today's weekday preset and re-plans chimes when the logical day changed.
+  /// today's weekday preset when the logical day changed, and re-plans chimes.
   Future<void> refresh({bool force = false}) async {
     final day = today;
-    if (!force && day == _currentDay) return;
+    if (!force && day == _currentDay) {
+      // Same day: still re-plan, so chimes dropped while notifications were
+      // off are registered again after the user turns them on (the scheduler
+      // skips a plan that is still registered).
+      unawaited(_replanChimes());
+      return;
+    }
     _currentDay = day;
     final changed = _rollOver(day);
     _armDayTimer();

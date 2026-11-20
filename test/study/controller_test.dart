@@ -10,10 +10,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 class RecordingChimes implements ChimeScheduler {
   List<Chime> last = const [];
+  int calls = 0;
   @override
   Future<void> init() async {}
   @override
-  Future<void> replaceAll(List<Chime> chimes) async => last = chimes;
+  Future<void> replaceAll(List<Chime> chimes) async {
+    calls++;
+    last = chimes;
+  }
 }
 
 int o(int h, int m) => LogicalDay.toOffset(h, m);
@@ -51,6 +55,19 @@ void main() {
     await reopened.init();
     expect(reopened.blocks.map((b) => b.name), ['勉強', '休憩']);
     reopened.dispose();
+  });
+
+  test('resume on the same day re-plans chimes', () async {
+    final c = make();
+    await c.init();
+    await c.addBlock(blk(c, '勉強', BlockType.study, o(9, 0), o(10, 0)));
+    await c.addBlock(blk(c, '休憩', BlockType.rest, o(10, 0), o(10, 10)));
+    final before = chimes.calls;
+    clock = DateTime(2026, 11, 20, 8, 30); // same logical day
+    await c.refresh();
+    expect(chimes.calls, before + 1);
+    expect(chimes.last.first.at, DateTime(2026, 11, 20, 10));
+    c.dispose();
   });
 
   test('first run does not invent history; later days are finalized', () async {

@@ -74,17 +74,44 @@ class NotificationChimeScheduler implements ChimeScheduler {
         final c = _pending!;
         _pending = null;
         final key = _key(c);
-        if (key == _appliedKey) continue;
+        if (key == _appliedKey && await _stillRegistered(c)) continue;
         try {
           _appliedKey = null;
           await _replace(c);
-          _appliedKey = key;
+          // iOS silently drops requests while notifications are off, so only
+          // remember the plan once they are on (a later resume re-applies).
+          if (await _enabled()) _appliedKey = key;
         } catch (_) {}
       }
     } finally {
       // Cleared in the same step the loop sees no pending plan, so a later
       // call always starts a new drain.
       _draining = null;
+    }
+  }
+
+  /// False when iOS holds fewer requests than the plan's future chimes
+  /// (e.g. they were dropped while notifications were disabled).
+  Future<bool> _stillRegistered(List<Chime> chimes) async {
+    try {
+      final now = DateTime.now();
+      final future = chimes.where((c) => c.at.isAfter(now)).length;
+      return (await _plugin.pendingNotificationRequests()).length >= future;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _enabled() async {
+    try {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      if (ios == null) return true;
+      return (await ios.checkPermissions())?.isEnabled ?? false;
+    } catch (_) {
+      return false;
     }
   }
 
