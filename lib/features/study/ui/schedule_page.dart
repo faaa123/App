@@ -79,6 +79,13 @@ class SchedulePage extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               buildDefaultDragHandles: false,
+              // Rounded like the Card, so no square shadow while dragging.
+              proxyDecorator: (child, _, _) => Material(
+                elevation: 6,
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: child,
+              ),
               onReorderItem: (from, to) async {
                 final ids = [for (final b in blocks) b.id];
                 ids.insert(to, ids.removeAt(from));

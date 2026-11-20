@@ -174,9 +174,15 @@ class _BlockDialogState extends State<_BlockDialog> {
                   onChanged: (v) => setState(() => _cascade = v ?? false),
                   child: const Column(
                     children: [
-                      RadioListTile(value: false, title: Text('このブロックのみ変更')),
+                      // Flush with the fields above.
+                      RadioListTile(
+                        value: false,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('このブロックのみ変更'),
+                      ),
                       RadioListTile(
                         value: true,
+                        contentPadding: EdgeInsets.zero,
                         title: Text('以降のブロックも同じ幅だけずらす'),
                       ),
                     ],
