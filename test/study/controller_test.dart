@@ -151,7 +151,7 @@ void main() {
           'updatedAt': 0,
         },
       ],
-      'summaries': {'2026-11-01': 'many', '2026-11-02': 45},
+      'summaries': {'2026-11-01': 'many', '2026-11-02': 45, 'x': 5},
       'lastRecorded': 12,
       'threshold': 'x',
     });
@@ -162,7 +162,25 @@ void main() {
     expect(c.presets.single.blocks, isEmpty);
     expect(c.presets.single.weekdays, {1});
     expect(c.threshold, 30);
+    expect(c.minutesByDate().containsKey('x'), isFalse);
     c.dispose();
+  });
+
+  test('a stored threshold of 0 or less falls back and stats still build', () async {
+    for (final t in [0, -5]) {
+      store = MemoryStudyStore({
+        'threshold': t,
+        'summaries': {'x': 10, '2026-11-19': -3, '2026-11-18': 40},
+      });
+      final c = make();
+      await c.init();
+      expect(c.threshold, 30);
+      expect(() => c.streak(), returnsNormally);
+      expect(c.minutesByDate().keys, isNot(contains('x')));
+      expect(c.minutesByDate().containsKey('2026-11-19'), isFalse);
+      expect(c.minutesByDate()['2026-11-18'], 40);
+      c.dispose();
+    }
   });
 
   test('init does not wait for notification permission', () async {

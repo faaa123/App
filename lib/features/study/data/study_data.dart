@@ -105,10 +105,17 @@ class StudyData {
     summaries: {
       for (final e in (j['summaries'] is Map ? j['summaries'] as Map : const {})
           .entries)
-        if (e.key is String && e.value is int) e.key as String: e.value as int,
+        if (_validDateKey(e.key) != null && e.value is int && e.value >= 0)
+          e.key as String: e.value as int,
     },
     lastRecorded: _validDateKey(j['lastRecorded']),
-    threshold: j['threshold'] is int ? j['threshold'] as int : 30,
+    // setThreshold keeps it ≥ 10; calculateStreak throws on ≤ 0.
+    threshold:
+        j['threshold'] is int &&
+            (j['threshold'] as int) >= 10 &&
+            (j['threshold'] as int) <= 1440
+        ? j['threshold'] as int
+        : 30,
   );
 }
 
