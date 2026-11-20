@@ -38,6 +38,10 @@ class _AppState extends State<App> {
       controller: widget.study,
       child: MaterialApp(
         title: 'App',
+        // Japanese glyph variants and Japanese text in pickers/dialogs.
+        locale: const Locale('ja', 'JP'),
+        supportedLocales: const [Locale('ja', 'JP')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         theme: ThemeData(
           colorSchemeSeed: Colors.indigo,
           brightness: Brightness.dark,
