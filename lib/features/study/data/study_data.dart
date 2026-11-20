@@ -1,5 +1,20 @@
 import '../core/block.dart';
 
+/// Parses what can be parsed: entries that fail (bad types, impossible
+/// offsets, overlaps with an earlier block) are dropped instead of throwing.
+List<Block> _parseBlocks(Object? list) {
+  final out = <Block>[];
+  for (final b in list is List ? list : const []) {
+    try {
+      final block = Block.fromJson(b as Map<String, dynamic>);
+      if (out.every((o) => block.end <= o.start || block.start >= o.end)) {
+        out.add(block);
+      }
+    } catch (_) {}
+  }
+  return sortedByStart(out);
+}
+
 /// A named schedule, optionally auto-applied on some weekdays.
 class Preset {
   const Preset({
@@ -39,10 +54,11 @@ class Preset {
   factory Preset.fromJson(Map<String, dynamic> j) => Preset(
     id: j['id'] as String,
     name: j['name'] as String,
-    blocks: [
-      for (final b in j['blocks'] as List) Block.fromJson(b as Map<String, dynamic>),
-    ],
-    weekdays: {for (final w in j['weekdays'] as List) w as int},
+    blocks: _parseBlocks(j['blocks']),
+    weekdays: {
+      for (final w in j['weekdays'] as List? ?? const [])
+        if (w is int && w >= 0 && w <= 6) w,
+    },
     updatedAt: DateTime.fromMillisecondsSinceEpoch(j['updatedAt'] as int),
   );
 }
@@ -81,19 +97,28 @@ class StudyData {
   };
 
   factory StudyData.fromJson(Map<String, dynamic> j) => StudyData(
-    blocks: [
-      for (final b in j['blocks'] as List? ?? const [])
-        Block.fromJson(b as Map<String, dynamic>),
-    ],
+    blocks: _parseBlocks(j['blocks']),
     presets: [
-      for (final p in j['presets'] as List? ?? const [])
-        Preset.fromJson(p as Map<String, dynamic>),
+      for (final p in j['presets'] is List ? j['presets'] as List : const [])
+        ?_tryParse(() => Preset.fromJson(p as Map<String, dynamic>)),
     ],
     summaries: {
-      for (final e in (j['summaries'] as Map? ?? const {}).entries)
-        e.key as String: e.value as int,
+      for (final e in (j['summaries'] is Map ? j['summaries'] as Map : const {})
+          .entries)
+        if (e.key is String && e.value is int) e.key as String: e.value as int,
     },
-    lastRecorded: j['lastRecorded'] as String?,
-    threshold: j['threshold'] as int? ?? 30,
+    lastRecorded: _validDateKey(j['lastRecorded']),
+    threshold: j['threshold'] is int ? j['threshold'] as int : 30,
   );
 }
+
+T? _tryParse<T>(T Function() parse) {
+  try {
+    return parse();
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _validDateKey(Object? v) =>
+    v is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(v) ? v : null;

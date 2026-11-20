@@ -46,9 +46,18 @@ class StudyController extends ChangeNotifier {
       '${_rand.nextInt(1 << 30).toRadixString(36)}';
 
   Future<void> init() async {
-    final json = await _store.load();
-    if (json != null) _data = StudyData.fromJson(json);
-    await _chimes.init();
+    try {
+      final json = await _store.load();
+      if (json != null) _data = StudyData.fromJson(json);
+    } catch (e) {
+      debugPrint('study data unreadable, starting fresh: $e');
+      _data = StudyData();
+    }
+    try {
+      await _chimes.init();
+    } catch (e) {
+      debugPrint('chime init failed: $e');
+    }
     await refresh(force: true);
     // Catch the 4:00 rollover while the app stays open.
     _dayTimer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());

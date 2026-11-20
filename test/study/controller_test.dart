@@ -89,4 +89,57 @@ void main() {
     expect(c.blocks.map((b) => b.name), ['sat', 'satRest']);
     c.dispose();
   });
+
+  test('malformed stored data does not block init', () async {
+    store = MemoryStudyStore({
+      'blocks': [
+        {'id': 'x', 'name': 'a', 'type': 'study', 'start': 10, 'end': 5},
+        {'id': 'y', 'name': 'b', 'type': 'nap', 'start': 10, 'end': 20},
+        {'id': 'z', 'name': 'ok', 'type': 'study', 'start': 30, 'end': 60},
+        {'id': 'w', 'name': 'overlap', 'type': 'rest', 'start': 40, 'end': 70},
+        'garbage',
+      ],
+      'presets': [
+        {'id': 'p', 'name': 3},
+        {
+          'id': 'q',
+          'name': 'good',
+          'blocks': [
+            {'id': 'a', 'name': 'a', 'type': 'rest', 'start': 0, 'end': 9999},
+          ],
+          'weekdays': [1, 9],
+          'updatedAt': 0,
+        },
+      ],
+      'summaries': {'2026-11-01': 'many', '2026-11-02': 45},
+      'lastRecorded': 12,
+      'threshold': 'x',
+    });
+    final c = make();
+    await c.init();
+    expect(c.blocks.map((b) => b.name), ['ok']);
+    expect(c.presets.map((p) => p.name), ['good']);
+    expect(c.presets.single.blocks, isEmpty);
+    expect(c.presets.single.weekdays, {1});
+    expect(c.threshold, 30);
+    c.dispose();
+  });
+
+  test('chime init failure does not block init', () async {
+    final c = StudyController(
+      store: store,
+      chimes: _ThrowingChimes(),
+      clock: () => clock,
+    );
+    await c.init();
+    expect(c.blocks, isEmpty);
+    c.dispose();
+  });
+}
+
+class _ThrowingChimes implements ChimeScheduler {
+  @override
+  Future<void> init() async => throw StateError('no notifications');
+  @override
+  Future<void> replaceAll(List<Chime> chimes) async {}
 }
