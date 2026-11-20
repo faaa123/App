@@ -133,7 +133,7 @@ void main() {
     test('overlap names both blocks with their times', () {
       expect(
         validateSchedule([study('勉強', o(9, 0), o(10, 0)), study('勉強', o(9, 30), o(11, 0))]),
-        '「勉強」(9:00–10:00)と「勉強」(9:30–11:00)の時間が重なっています',
+        '「勉強」(9:00〜10:00)と「勉強」(9:30〜11:00)の時間が重なっています',
       );
     });
     test('day end is described without the internal term', () {

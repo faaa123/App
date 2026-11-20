@@ -105,8 +105,8 @@ class _BlockDialogState extends State<_BlockDialog> {
         final old = before[b.id]!;
         if (b.id != e.id && old.start != b.start) {
           shifted.add(
-            '${b.name}：${LogicalDay.clock(old.start)}–${LogicalDay.clock(old.end)}'
-            ' → ${LogicalDay.clock(b.start)}–${LogicalDay.clock(b.end)}',
+            '${b.name}：${LogicalDay.clock(old.start)}〜${LogicalDay.clock(old.end)}'
+            ' → ${LogicalDay.clock(b.start)}〜${LogicalDay.clock(b.end)}',
           );
         }
       }

@@ -200,7 +200,7 @@ class _BlockTile extends StatelessWidget {
         // Times lead (they are what a timetable is scanned for); the name
         // shows only when it says more than the avatar's type.
         title: Text(
-          '${LogicalDay.clock(block.start)} – ${LogicalDay.clock(block.end)}',
+          '${LogicalDay.clock(block.start)}〜${LogicalDay.clock(block.end)}',
           style: const TextStyle(
             fontFeatures: [FontFeature.tabularFigures()],
           ),

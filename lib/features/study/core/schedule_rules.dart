@@ -13,7 +13,7 @@ String? validateSchedule(List<Block> blocks) {
   return null;
 }
 
-String _range(Block b) => '${LogicalDay.clock(b.start)}–${LogicalDay.clock(b.end)}';
+String _range(Block b) => '${LogicalDay.clock(b.start)}〜${LogicalDay.clock(b.end)}';
 
 /// Result of an edit: the whole new schedule, or an error.
 class EditResult {
