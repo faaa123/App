@@ -12,6 +12,5 @@ void main() {
 
     // Test host is not iOS, so the canvas shows its placeholder.
     expect(find.text('この機能は iPad でのみ利用できます'), findsOneWidget);
-    expect(find.byTooltip('全消去'), findsOneWidget);
   });
 }

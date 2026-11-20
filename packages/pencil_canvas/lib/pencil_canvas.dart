@@ -9,15 +9,21 @@ class PencilCanvasController {
 
   final MethodChannel _channel;
 
-  /// Erases everything on the canvas.
+  /// Erases everything on the board.
   Future<void> clear() => _channel.invokeMethod<void>('clear');
 
   /// Undoes the last stroke.
   Future<void> undo() => _channel.invokeMethod<void>('undo');
+
+  /// Shows or hides the system tool picker.
+  Future<void> toggleTools() => _channel.invokeMethod<void>('toggleTools');
 }
 
-/// A PencilKit canvas (iOS only). Draws with a fixed pen and Apple Pencil
-/// input only. Content is not persisted.
+/// A PencilKit whiteboard (iOS only).
+///
+/// Apple Pencil draws, fingers pan and pinch-zoom. Squeezing Apple Pencil Pro
+/// toggles the tool picker. Tool / undo / clear buttons are drawn natively on
+/// top of the canvas so no Flutter overlay sits above it. Nothing is saved.
 ///
 /// On other platforms a placeholder is shown.
 class PencilCanvas extends StatelessWidget {
