@@ -37,7 +37,11 @@ class _NowPageState extends State<NowPage> {
     final c = StudyScope.of(context);
     final now = c.now();
     final blocks = c.blocks;
-    final status = resolveNow(blocks, now);
+    final status = resolveNow(
+      blocks,
+      now,
+      tomorrow: c.scheduleFor(LogicalDay.addDays(c.today, 1)),
+    );
     final offset = LogicalDay.offsetOf(now);
     final text = Theme.of(context).textTheme;
 
@@ -59,7 +63,9 @@ class _NowPageState extends State<NowPage> {
             ],
           ),
           const SizedBox(height: 24),
-          Expanded(child: _StatusPanel(status: status)),
+          Expanded(
+            child: _StatusPanel(status: status, hasToday: blocks.isNotEmpty),
+          ),
           if (blocks.isNotEmpty) ...[
             const SizedBox(height: 24),
             DayBand(blocks: blocks, nowOffset: offset),
@@ -76,9 +82,10 @@ class _NowPageState extends State<NowPage> {
 }
 
 class _StatusPanel extends StatelessWidget {
-  const _StatusPanel({required this.status});
+  const _StatusPanel({required this.status, required this.hasToday});
 
   final NowStatus status;
+  final bool hasToday;
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +113,7 @@ class _StatusPanel extends StatelessWidget {
                 color: scheme.surfaceContainerHigh,
                 onColor: scheme.onSurface,
                 icon: Icons.nights_stay_outlined,
-                title: '本日の予定は終了',
+                title: hasToday ? '本日の予定は終了' : '本日は予定なし',
                 big: formatCountdown(secondsUntilTomorrowFirst),
                 caption: '明日の最初のブロックまで',
               ),

@@ -36,7 +36,9 @@ class DayEnded extends NowStatus {
 
 /// Resolve the status at [now] for today's [blocks]. Block membership is
 /// decided by the minute (like the Android app); countdowns use seconds.
-NowStatus resolveNow(List<Block> blocks, DateTime now) {
+/// [tomorrow] is the next logical day's schedule (weekday presets may differ);
+/// it defaults to [blocks].
+NowStatus resolveNow(List<Block> blocks, DateTime now, {List<Block>? tomorrow}) {
   final offset = LogicalDay.offsetOf(now);
   final nowSec = offset * 60 + now.second;
   final s = sortedByStart(blocks);
@@ -56,7 +58,7 @@ NowStatus resolveNow(List<Block> blocks, DateTime now) {
   if (next != null) {
     return Free(next: next, secondsUntilNext: next.start * 60 - nowSec);
   }
-  final first = s.firstOrNull;
+  final first = sortedByStart(tomorrow ?? blocks).firstOrNull;
   return DayEnded(
     secondsUntilTomorrowFirst: first == null
         ? null

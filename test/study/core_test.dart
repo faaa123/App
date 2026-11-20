@@ -72,6 +72,26 @@ void main() {
       final s = resolveNow(blocks, DateTime(2026, 1, 2, 2, 0)) as DayEnded;
       expect(s.secondsUntilTomorrowFirst, 7 * 3600);
     });
+    test('day ended → tomorrow may have a different (preset) schedule', () {
+      final s = resolveNow(
+        blocks,
+        DateTime(2026, 1, 2, 2, 0),
+        tomorrow: [study('t', o(6, 0), o(7, 0))],
+      ) as DayEnded;
+      expect(s.secondsUntilTomorrowFirst, 4 * 3600);
+      final e = resolveNow(
+        const [],
+        DateTime(2026, 1, 1, 12),
+        tomorrow: [study('t', o(6, 0), o(7, 0))],
+      ) as DayEnded;
+      expect(e.secondsUntilTomorrowFirst, 18 * 3600);
+      final none = resolveNow(
+        blocks,
+        DateTime(2026, 1, 2, 2, 0),
+        tomorrow: const [],
+      ) as DayEnded;
+      expect(none.secondsUntilTomorrowFirst, isNull);
+    });
     test('no schedule', () {
       final s = resolveNow(const [], DateTime(2026, 1, 1, 12)) as DayEnded;
       expect(s.secondsUntilTomorrowFirst, isNull);
