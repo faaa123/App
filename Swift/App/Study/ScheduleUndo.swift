@@ -9,7 +9,7 @@ import StudyCore
 @MainActor
 @Observable
 final class ScheduleUndo {
-    @ObservationIgnored let study: StudyController
+    let study: StudyController
     /// The window's undo manager, captured at the last edit.
     @ObservationIgnored private weak var undoManager: UndoManager?
 

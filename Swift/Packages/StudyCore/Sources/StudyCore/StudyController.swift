@@ -33,10 +33,10 @@ public final class NoopChimeScheduler: ChimeScheduler {
 @MainActor
 @Observable
 public final class StudyController {
-    @ObservationIgnored private let store: any StudyStore
-    @ObservationIgnored private let chimes: any ChimeScheduler
+    private let store: any StudyStore
+    private let chimes: any ChimeScheduler
     /// Single source of the current time (swap in tests).
-    @ObservationIgnored public let now: () -> Instant
+    public let now: () -> Instant
     @ObservationIgnored public var log: (String) -> Void = { print($0) }
 
     private var data = StudyData()

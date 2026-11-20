@@ -25,8 +25,8 @@ final class NotificationChimeScheduler: ChimeScheduler {
 
     // Completion handlers below are @Sendable: UserNotifications calls them on
     // its own queue, and a main-actor closure there would trap in Swift 6.
-    @ObservationIgnored private let center = UNUserNotificationCenter.current()
-    @ObservationIgnored private let presenter = ForegroundPresenter()
+    private let center = UNUserNotificationCenter.current()
+    private let presenter = ForegroundPresenter()
     /// Latest plan not yet applied; earlier unapplied plans are dropped.
     @ObservationIgnored private var pendingPlan: [Chime]?
     @ObservationIgnored private var draining = false
