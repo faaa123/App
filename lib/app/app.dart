@@ -42,12 +42,71 @@ class _AppState extends State<App> {
         locale: const Locale('ja', 'JP'),
         supportedLocales: const [Locale('ja', 'JP')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: ThemeData(
-          colorSchemeSeed: Colors.indigo,
-          brightness: Brightness.dark,
-        ),
+        theme: _glassTheme(),
         home: const Shell(features: appFeatures),
       ),
     );
   }
+}
+
+/// Dark theme whose surfaces are translucent "glass" over the shell's
+/// gradient backdrop (see glass.dart).
+ThemeData _glassTheme() {
+  final base = ThemeData(
+    colorSchemeSeed: const Color(0xFF6C7BFF),
+    brightness: Brightness.dark,
+  );
+  final glassFill = Colors.white.withValues(alpha: 0.07);
+  final rim = BorderSide(color: Colors.white.withValues(alpha: 0.12));
+  return base.copyWith(
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      titleTextStyle: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+    ),
+    cardTheme: CardThemeData(
+      color: glassFill,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: rim,
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: const Color(0xFF1B2040).withValues(alpha: 0.96),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: rim,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      width: 520,
+      backgroundColor: const Color(0xFF262C52),
+      contentTextStyle: const TextStyle(color: Colors.white),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: rim,
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+        shape: const StadiumBorder(),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+        shape: const StadiumBorder(),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+        backgroundColor: glassFill,
+      ),
+    ),
+  );
 }

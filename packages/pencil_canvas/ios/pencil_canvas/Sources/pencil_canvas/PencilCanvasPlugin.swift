@@ -31,11 +31,14 @@ final class PencilCanvasViewFactory: NSObject, FlutterPlatformViewFactory {
 
 /// Temporary whiteboard. Apple Pencil draws, fingers pan/zoom. Nothing is persisted.
 ///
-/// Squeeze (Apple Pencil Pro) and double-tap are handled by PKToolPicker itself:
-/// with the "show contextual palette" setting, squeezing shows the tool palette
-/// right at the hovering pencil tip. We deliberately install no UIPencilInteraction
-/// of our own, because a custom squeeze handler would override that built-in behavior.
-final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
+/// Squeeze (Apple Pencil Pro) is left to PKToolPicker: with the "show contextual
+/// palette" setting it shows the palette right at the hovering pencil tip. Our
+/// UIPencilInteraction therefore implements only the double-tap callbacks (a
+/// squeeze callback would override that built-in behavior). PKToolPicker handles
+/// double-tap only while it is visible, so we handle it while it is hidden.
+final class PencilCanvasPlatformView: NSObject, FlutterPlatformView,
+  UIPencilInteractionDelegate
+{
   /// Board size relative to the visible area.
   private static let boardScale: CGFloat = 3
 
@@ -44,6 +47,8 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
   private let toolPicker = PKToolPicker()
   private let channel: FlutterMethodChannel
   private let initialTool = PKInkingTool(.pen, color: .black, width: 3)
+  /// Tool to return to for "switch to previous tool" and eraser toggling.
+  private var previousTool: PKTool?
 
   init(frame: CGRect, viewId: Int64, messenger: FlutterBinaryMessenger) {
     container = BoardContainerView(frame: frame)
@@ -70,6 +75,10 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
     toolPicker.addObserver(canvas)
     // Associate the picker with the canvas (hidden until squeezed / tools button).
     toolPicker.setVisible(false, forFirstResponder: canvas)
+
+    let pencil = UIPencilInteraction()
+    pencil.delegate = self
+    container.addInteraction(pencil)
 
     addButtons()
 
@@ -116,13 +125,53 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
     toolPicker.setVisible(!toolPicker.isVisible, forFirstResponder: canvas)
   }
 
+  // MARK: - Apple Pencil double-tap
+
+  @available(iOS 17.5, *)
+  func pencilInteraction(
+    _ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap
+  ) {
+    handleDoubleTap()
+  }
+
+  /// Before iOS 17.5.
+  func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+    handleDoubleTap()
+  }
+
+  /// Follows Settings > Apple Pencil > double-tap. Only while the picker is
+  /// hidden; when visible, PKToolPicker does this itself.
+  private func handleDoubleTap() {
+    guard !toolPicker.isVisible else { return }
+    switch UIPencilInteraction.preferredTapAction {
+    case .ignore:
+      return
+    case .switchEraser:
+      if canvas.tool is PKEraserTool {
+        select(previousTool ?? initialTool)
+      } else {
+        select(PKEraserTool(.vector))
+      }
+    case .switchPrevious:
+      select(previousTool ?? initialTool)
+    default:  // color palette, ink attributes, contextual palette, …
+      toggleToolPicker()
+    }
+  }
+
+  private func select(_ tool: PKTool) {
+    previousTool = canvas.tool
+    canvas.tool = tool
+    toolPicker.selectedTool = tool  // keep the picker in sync
+  }
+
   // MARK: - Native buttons (avoid Flutter overlays above the canvas)
 
   private func addButtons() {
     // Top-left: app menu (the Flutter side shows/hides its navigation).
     addToolbar(
       [
-        makeButton("sidebar.left", label: "メニュー") { [weak self] in
+        makeButton("square.grid.2x2", label: "メニュー") { [weak self] in
           self?.channel.invokeMethod("menu", arguments: nil)
         }
       ], leading: true)

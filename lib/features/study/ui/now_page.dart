@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../app/glass.dart';
+
 import '../core/logical_day.dart';
 import '../core/now_status.dart';
 import '../core/stats.dart';
@@ -67,7 +69,10 @@ class _NowPageState extends State<NowPage> {
     final text = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+      // Tighter in short windows (Split View).
+      padding: MediaQuery.sizeOf(context).height < 600
+          ? const EdgeInsets.fromLTRB(20, 4, 20, 8)
+          : const EdgeInsets.fromLTRB(32, 8, 32, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -107,6 +112,8 @@ class _NowPageState extends State<NowPage> {
   }
 }
 
+const _neutral = Color(0x12FFFFFF);
+
 class _StatusPanel extends StatelessWidget {
   const _StatusPanel({required this.status, required this.hasToday});
 
@@ -119,7 +126,7 @@ class _StatusPanel extends StatelessWidget {
     return switch (status) {
       InBlock s => _InBlockPanel(status: s),
       Free s => _Panel(
-        color: scheme.surfaceContainerHigh,
+        color: _neutral,
         onColor: scheme.onSurface,
         icon: Icons.hourglass_empty,
         title: 'フリー',
@@ -129,14 +136,14 @@ class _StatusPanel extends StatelessWidget {
       DayEnded(:final secondsUntilTomorrowFirst) =>
         secondsUntilTomorrowFirst == null
             ? _Panel(
-                color: scheme.surfaceContainerHigh,
+                color: _neutral,
                 onColor: scheme.onSurface,
                 icon: Icons.edit_calendar_outlined,
                 title: 'スケジュールがありません',
                 caption: '「スケジュール」から勉強・休憩のブロックを作りましょう',
               )
             : _Panel(
-                color: scheme.surfaceContainerHigh,
+                color: _neutral,
                 onColor: scheme.onSurface,
                 icon: Icons.nights_stay_outlined,
                 title: hasToday ? '本日の予定は終了' : '本日は予定なし',
@@ -214,11 +221,11 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(28),
-      ),
+    // Glass card: block colors stay strong (they carry meaning), neutral
+    // states are faint glass over the backdrop.
+    return Glass(
+      radius: 36,
+      tint: color.a == 1 ? color.withValues(alpha: 0.82) : color,
       child: LayoutBuilder(
         builder: (context, constraints) => Padding(
           padding: EdgeInsets.all(constraints.maxHeight < 500 ? 20 : 40),

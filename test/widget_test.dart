@@ -28,11 +28,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('ブロックを追加'), findsOneWidget);
 
-    // Presets open inside the feature area; the rail stays visible.
+    // Presets open inside the feature area; the tab bar stays visible.
     await tester.tap(find.text('プリセット'));
     await tester.pumpAndSettle();
     expect(find.text('現在のスケジュールを保存'), findsOneWidget);
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.text('統計'), findsOneWidget);
 
     await tester.tap(find.text('統計'));
     await tester.pumpAndSettle();
@@ -42,6 +42,8 @@ void main() {
     await tester.pumpAndSettle();
     // Test host is not iOS, so the canvas shows its placeholder.
     expect(find.text('この機能は iPad でのみ利用できます'), findsOneWidget);
+    // The board is full screen: no tab bar until its menu button asks.
+    expect(find.text('統計'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     study.dispose();
