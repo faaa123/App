@@ -76,9 +76,21 @@ struct Card<Content: View>: View {
 }
 
 extension View {
-    /// Caps content width and centres it, so text lines and lists do not
-    /// stretch across a large landscape iPad.
+    /// Keeps the scroll view full width (so its background and edge scrolling
+    /// reach the window edges) but centres its content in a readable column
+    /// on a large landscape iPad.
     func readableWidth(_ maxWidth: CGFloat = 760) -> some View {
-        frame(maxWidth: maxWidth).frame(maxWidth: .infinity)
+        modifier(ReadableContentMargins(maxWidth: maxWidth))
+    }
+}
+
+private struct ReadableContentMargins: ViewModifier {
+    let maxWidth: CGFloat
+    @State private var width: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(.horizontal, max(0, (width - maxWidth) / 2), for: .scrollContent)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }

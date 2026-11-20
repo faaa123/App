@@ -26,8 +26,8 @@ struct StatsView: View {
                     .padding(.horizontal, 4)
             }
             .padding(20)
-            .readableWidth(900)
         }
+        .readableWidth(900)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("統計")
     }
