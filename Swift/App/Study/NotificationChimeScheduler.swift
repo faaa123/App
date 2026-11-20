@@ -1,0 +1,99 @@
+import Foundation
+import StudyCore
+import UserNotifications
+
+/// Study⇄rest chimes as local notifications with sound, delivered even when
+/// the app is closed. iOS keeps at most 64 pending requests per app; the plan
+/// is bounded (7 days, ≤ 60).
+///
+/// Request ids are derived from each chime's content (same formula as the
+/// Flutter app), so a re-plan only touches what differs: after some chimes
+/// fired only the new tail is added, and requests iOS dropped (notifications
+/// were off) are simply added again.
+@MainActor
+final class NotificationChimeScheduler: ChimeScheduler {
+    // Completion handlers below are @Sendable: UserNotifications calls them on
+    // its own queue, and a main-actor closure there would trap in Swift 6.
+    private let center = UNUserNotificationCenter.current()
+    private let presenter = ForegroundPresenter()
+    private var ready: Task<Void, Never>?
+    /// Latest plan not yet applied; earlier unapplied plans are dropped.
+    private var pendingPlan: [Chime]?
+    private var draining = false
+
+    init() {
+        // Sound and banner while the app is in front, too.
+        center.delegate = presenter
+        ready = Task {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                center.requestAuthorization(options: [.alert, .sound]) { @Sendable _, error in
+                    if let error { print("notification permission failed: \(error)") }
+                    cont.resume()
+                }
+            }
+        }
+    }
+
+    func replaceAll(_ chimes: [Chime]) {
+        pendingPlan = chimes
+        guard !draining else { return }
+        draining = true
+        Task {
+            await ready?.value
+            // Applies only the newest plan, one at a time.
+            while let plan = pendingPlan {
+                pendingPlan = nil
+                await sync(plan)
+            }
+            draining = false
+        }
+    }
+
+    private func sync(_ chimes: [Chime]) async {
+        let now = Date()
+        var wanted: [(id: Int, item: (Chime, Date))] = []
+        for c in chimes {
+            guard let at = c.at.date(), at > now else { continue }
+            let ms = Int64((at.timeIntervalSince1970 * 1000).rounded())
+            wanted.append((chimeId(c, epochMillis: ms), (c, at)))
+        }
+        let identifiers = await pendingIdentifiers()
+        // Anything that is not one of our numeric ids is stale too.
+        let foreign = identifiers.filter { Int($0) == nil }
+        let diff = diffChimes(pendingIds: Set(identifiers.compactMap { Int($0) }), wanted: wanted)
+        let cancel = foreign + diff.cancel.map(String.init)
+        if !cancel.isEmpty { center.removePendingNotificationRequests(withIdentifiers: cancel) }
+        for (id, (chime, at)) in diff.add {
+            let content = UNMutableNotificationContent()
+            content.title = chime.title
+            content.body = chime.body
+            content.sound = .default
+            let interval = at.timeIntervalSinceNow
+            guard interval > 0 else { continue }
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+            let request = UNNotificationRequest(identifier: String(id), content: content, trigger: trigger)
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                center.add(request) { @Sendable error in
+                    if let error { print("chime schedule failed: \(error)") }
+                    cont.resume()
+                }
+            }
+        }
+    }
+
+    private func pendingIdentifiers() async -> [String] {
+        await withCheckedContinuation { cont in
+            center.getPendingNotificationRequests { @Sendable requests in
+                cont.resume(returning: requests.map(\.identifier))
+            }
+        }
+    }
+}
+
+/// Shows chimes as banner + sound while the app is in the foreground.
+private final class ForegroundPresenter: NSObject, UNUserNotificationCenterDelegate, Sendable {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+}

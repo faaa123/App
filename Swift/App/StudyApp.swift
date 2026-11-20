@@ -28,7 +28,7 @@ struct StudyApp: SwiftUI.App {
             print("Application Support unavailable, data will not persist: \(error)")
             store = MemoryStudyStore()
         }
-        let c = StudyController(store: store, chimes: NoopChimeScheduler()) { Instant(Date()) }
+        let c = StudyController(store: store, chimes: NotificationChimeScheduler()) { Instant(Date()) }
         c.load()
         return c
     }
