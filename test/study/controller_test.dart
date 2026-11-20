@@ -90,6 +90,44 @@ void main() {
     c.dispose();
   });
 
+  Future<StudyController> withSaturdayPreset() async {
+    final c = make();
+    await c.init();
+    await c.setBlocks([blk(c, 'sat', BlockType.study, o(13, 0), o(14, 0))]);
+    await c.saveAsPreset('weekend');
+    await c.setPresetWeekdays(c.presets.single.id, {6}); // Saturday
+    await c.setBlocks([blk(c, 'fri', BlockType.study, o(9, 0), o(10, 0))]);
+    return c;
+  }
+
+  test('edits on a preset day carry over and are recorded', () async {
+    final c = await withSaturdayPreset();
+    clock = DateTime(2026, 11, 21, 8); // Saturday
+    await c.refresh();
+    expect(c.blocks.map((b) => b.name), ['sat']);
+    await c.setBlocks([blk(c, 'satEdited', BlockType.study, o(13, 0), o(15, 0))]);
+
+    clock = DateTime(2026, 11, 22, 8); // Sunday, no preset
+    await c.refresh();
+    expect(c.minutesByDate()['2026-11-21'], 120);
+    expect(c.blocks.map((b) => b.name), ['satEdited']);
+    c.dispose();
+  });
+
+  test('same-day edits on a preset day survive a restart', () async {
+    final c = await withSaturdayPreset();
+    clock = DateTime(2026, 11, 21, 8); // Saturday
+    await c.refresh();
+    await c.setBlocks([blk(c, 'satEdited', BlockType.study, o(13, 0), o(15, 0))]);
+    c.dispose();
+
+    clock = DateTime(2026, 11, 21, 12);
+    final reopened = make();
+    await reopened.init();
+    expect(reopened.blocks.map((b) => b.name), ['satEdited']);
+    reopened.dispose();
+  });
+
   test('malformed stored data does not block init', () async {
     store = MemoryStudyStore({
       'blocks': [

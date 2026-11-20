@@ -197,23 +197,31 @@ class StudyController extends ChangeNotifier {
     return sched;
   }
 
-  void _rollOver(DateTime day) {
+  /// Finalizes days before [day] and, once per logical day, applies [day]'s
+  /// weekday preset. Returns whether anything changed.
+  bool _rollOver(DateTime day) {
     final yesterday = LogicalDay.addDays(day, -1);
     final last = _data.lastRecorded == null
         ? null
         : LogicalDay.parseDateKey(_data.lastRecorded!);
+    var advanced = false;
     if (last == null) {
       // First run: no history to invent.
       _data.lastRecorded = LogicalDay.dateKey(yesterday);
+      advanced = true;
     } else if (last.isBefore(yesterday)) {
-      // Finalize the missing days. The stored schedule is the one that was in
-      // effect when the app was last used; replay weekday presets from there.
+      // Finalize the missing days. The stored schedule is the one in effect on
+      // the last-used day (its preset was applied when that day began, then
+      // possibly edited), so presets are only replayed for later days.
+      final lastUsed = LogicalDay.addDays(last, 1);
       var sched = _data.blocks;
-      var d = LogicalDay.addDays(last, 1);
+      var d = lastUsed;
       final floor = LogicalDay.addDays(yesterday, -_backfillDays);
       while (!d.isAfter(yesterday)) {
-        final p = presetForWeekday(LogicalDay.weekdayOf(d));
-        if (p != null) sched = p.blocks;
+        if (d.isAfter(lastUsed)) {
+          final p = presetForWeekday(LogicalDay.weekdayOf(d));
+          if (p != null) sched = p.blocks;
+        }
         if (d.isAfter(floor)) {
           _data.summaries[LogicalDay.dateKey(d)] = totalStudyMinutes(sched);
         }
@@ -221,16 +229,22 @@ class StudyController extends ChangeNotifier {
       }
       if (!identical(sched, _data.blocks)) _data.blocks = _freshIds(sched);
       _data.lastRecorded = LogicalDay.dateKey(yesterday);
+      advanced = true;
     }
-    // Today's weekday preset, only when it differs (no extra state needed).
-    final p = presetForWeekday(LogicalDay.weekdayOf(day));
-    if (p != null && !sameSchedule(p.blocks, _data.blocks)) {
-      _data.blocks = _freshIds(p.blocks);
+    if (advanced) {
+      // Today's weekday preset, only when the day begins (D-12): same-day
+      // edits and manual applies survive restarts.
+      final p = presetForWeekday(LogicalDay.weekdayOf(day));
+      if (p != null && !sameSchedule(p.blocks, _data.blocks)) {
+        _data.blocks = _freshIds(p.blocks);
+      }
     }
     final cutoff = LogicalDay.dateKey(
       LogicalDay.addDays(day, -_keepSummaryDays),
     );
+    final before = _data.summaries.length;
     _data.summaries.removeWhere((k, _) => k.compareTo(cutoff) < 0);
+    return advanced || _data.summaries.length != before;
   }
 
   Future<void> _commit() async {
