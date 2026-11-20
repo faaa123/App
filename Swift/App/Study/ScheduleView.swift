@@ -92,28 +92,8 @@ struct ScheduleView: View {
                 } else {
                     let nowOffset = LogicalDay.offset(of: study.now().local)
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { i, b in
-                        let current = b.contains(nowOffset)
-                        // A real button: works with VoiceOver, Full Keyboard
-                        // Access and pointer hover, not only touch.
-                        Button { editing = .block(b) } label: {
-                            BlockRow(block: b,
-                                     gapBefore: i > 0 ? b.start - blocks[i - 1].end : 0,
-                                     isCurrent: current,
-                                     isPast: b.end <= nowOffset)
-                        }
-                        .tint(.primary)
-                        .listRowBackground(current ? BlockStyle.of(b.type).color : nil)
-                        .accessibilityHint("編集します")
-                        .accessibilityAction(named: "前へ移動") { move(from: i, to: i - 1) }
-                        .accessibilityAction(named: "後ろへ移動") { move(from: i, to: i + 2) }
-                        .accessibilityAction(named: "削除") { delete(b) }
-                        .swipeActions {
-                            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
-                        }
-                        .contextMenu {
-                            Button("編集", systemImage: "pencil") { editing = .block(b) }
-                            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
-                        }
+                        blockRow(b, at: i, gapBefore: i > 0 ? b.start - blocks[i - 1].end : 0,
+                                 nowOffset: nowOffset)
                     }
                     .onMove { from, to in
                         guard let i = from.first else { return }
@@ -146,6 +126,30 @@ struct ScheduleView: View {
             list
         } else {
             list.readableWidth()
+        }
+    }
+
+    /// One block in the list: a real button (works with VoiceOver, Full
+    /// Keyboard Access and pointer hover, not only touch), filled with its
+    /// block color while it is running.
+    private func blockRow(_ b: Block, at i: Int, gapBefore: Int, nowOffset: Int) -> some View {
+        let current = b.contains(nowOffset)
+        let background: Color? = current ? BlockStyle.of(b.type).color : nil
+        return Button { editing = .block(b) } label: {
+            BlockRow(block: b, gapBefore: gapBefore, isCurrent: current, isPast: b.end <= nowOffset)
+        }
+        .tint(.primary)
+        .listRowBackground(background)
+        .accessibilityHint("編集します")
+        .accessibilityAction(named: "前へ移動") { move(from: i, to: i - 1) }
+        .accessibilityAction(named: "後ろへ移動") { move(from: i, to: i + 2) }
+        .accessibilityAction(named: "削除") { delete(b) }
+        .swipeActions {
+            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
+        }
+        .contextMenu {
+            Button("編集", systemImage: "pencil") { editing = .block(b) }
+            Button("削除", systemImage: "trash", role: .destructive) { delete(b) }
         }
     }
 
