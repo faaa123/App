@@ -1,7 +1,6 @@
 import Flutter
 import PencilKit
 import UIKit
-import UIKit.UIGestureRecognizerSubclass
 
 public class PencilCanvasPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -161,18 +160,23 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
 final class BoardContainerView: UIView {
   var onFirstLayout: ((CGSize) -> Void)?
 
+  required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
   override init(frame: CGRect) {
     super.init(frame: frame)
-    // Passive recognizer: re-applies the forwarding cut at each touch start in case
-    // Flutter recreated its recognizer. Never recognizes, never delays touches.
-    addGestureRecognizer(TouchStartObserver { [weak self] in self?.stopFlutterTouchForwarding() })
   }
-
-  required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
   override func didMoveToSuperview() {
     super.didMoveToSuperview()
     stopFlutterTouchForwarding()
+  }
+
+  /// Flutter recreates its forwarding recognizer after each gesture, so the cut is
+  /// re-applied here: UIKit hit-tests before any recognizer sees touchesBegan, so
+  /// the new recognizer is disabled before it can forward the pen-down.
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    stopFlutterTouchForwarding()
+    return super.hitTest(point, with: event)
   }
 
   override func layoutSubviews() {
@@ -196,27 +200,4 @@ final class BoardContainerView: UIView {
       recognizer.isEnabled = false
     }
   }
-}
-
-private final class TouchStartObserver: UIGestureRecognizer, UIGestureRecognizerDelegate {
-  private let onTouchStart: () -> Void
-
-  init(onTouchStart: @escaping () -> Void) {
-    self.onTouchStart = onTouchStart
-    super.init(target: nil, action: nil)
-    cancelsTouchesInView = false
-    delaysTouchesBegan = false
-    delaysTouchesEnded = false
-    delegate = self
-  }
-
-  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-    onTouchStart()
-    state = .failed
-  }
-
-  func gestureRecognizer(
-    _ gestureRecognizer: UIGestureRecognizer,
-    shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
-  ) -> Bool { true }
 }
