@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/block.dart';
 import '../core/logical_day.dart';
 import '../core/schedule_rules.dart';
+import '../core/stats.dart';
 import '../data/study_controller.dart';
 import 'study_scope.dart';
 import 'time_picking.dart';
@@ -258,55 +259,61 @@ class _PomodoroDialogState extends State<_PomodoroDialog> {
       title: const Text('🍅 ポモドーロで敷き詰める'),
       content: SizedBox(
         width: 440,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TimeField(
-                    label: '開始',
-                    offset: _start,
-                    isEnd: false,
-                    onChanged: (v) => setState(() => _start = v),
+        // Scrolls with large text or in a short window.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TimeField(
+                      label: '開始',
+                      offset: _start,
+                      isEnd: false,
+                      onChanged: (v) => setState(() => _start = v),
+                    ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('〜'),
-                ),
-                Expanded(
-                  child: TimeField(
-                    label: '終了',
-                    offset: _end,
-                    isEnd: true,
-                    onChanged: (v) => setState(() => _end = v),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('〜'),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            MinuteStepper(
-              label: '勉強',
-              value: _study,
-              min: 5,
-              max: 180,
-              onChanged: (v) => setState(() => _study = v),
-            ),
-            MinuteStepper(
-              label: '休憩',
-              value: _rest,
-              max: 60,
-              onChanged: (v) => setState(() => _rest = v),
-            ),
-            const SizedBox(height: 8),
-            Text('${generated.length}個のブロックを追加します'),
-            if (err != null) ...[
+                  Expanded(
+                    child: TimeField(
+                      label: '終了',
+                      offset: _end,
+                      isEnd: true,
+                      onChanged: (v) => setState(() => _end = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              MinuteStepper(
+                label: '勉強',
+                value: _study,
+                min: 5,
+                max: 180,
+                onChanged: (v) => setState(() => _study = v),
+              ),
+              MinuteStepper(
+                label: '休憩',
+                value: _rest,
+                max: 60,
+                onChanged: (v) => setState(() => _rest = v),
+              ),
               const SizedBox(height: 8),
-              Text(err, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                '${generated.length}個のブロック'
+                '（勉強${formatMinutes(totalStudyMinutes(generated))}）を追加します',
+              ),
+              if (err != null) ...[
+                const SizedBox(height: 8),
+                Text(err, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
