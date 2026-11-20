@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/block.dart';
@@ -5,7 +6,8 @@ import '../core/logical_day.dart';
 import 'study_scope.dart';
 
 /// Today's blocks as one horizontal band: past = filled, current = partly
-/// filled, future = outlined, free time = empty gap.
+/// filled, future = outlined, free time = empty gap. [blocks] must be sorted
+/// by start (as `StudyController.blocks` is).
 class DayBand extends StatelessWidget {
   const DayBand({super.key, required this.blocks, required this.nowOffset});
 
@@ -14,7 +16,7 @@ class DayBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = sortedByStart(blocks);
+    final s = blocks;
     final from = s.first.start, to = s.last.end;
     final text = Theme.of(context).textTheme.labelMedium;
     return Column(
@@ -99,5 +101,9 @@ class _BandPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BandPainter old) =>
-      old.now != now || old.blocks != blocks || old.nowColor != nowColor;
+      // The list is rebuilt every second but holds the same Block instances
+      // between edits; repaint only when the minute or the blocks change.
+      old.now != now ||
+      old.nowColor != nowColor ||
+      !listEquals(old.blocks, blocks);
 }

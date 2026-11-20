@@ -92,7 +92,9 @@ class _NowPageState extends State<NowPage> {
           ),
           if (blocks.isNotEmpty) ...[
             const SizedBox(height: 24),
-            DayBand(blocks: blocks, nowOffset: offset),
+            RepaintBoundary(
+              child: DayBand(blocks: blocks, nowOffset: offset),
+            ),
           ],
         ],
       ),
