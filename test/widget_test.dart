@@ -5,6 +5,8 @@ import 'package:app/features/study/data/chime_scheduler.dart';
 import 'package:app/features/study/data/study_controller.dart';
 import 'package:app/features/study/data/study_store.dart';
 import 'package:app/features/study/ui/block_dialogs.dart';
+import 'package:app/features/study/ui/stats_page.dart';
+import 'package:app/features/study/ui/study_scope.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -159,6 +161,43 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(study.blocks.map((b) => b.name), ['sat']);
+
+    await tester.pumpWidget(const SizedBox());
+    study.dispose();
+  });
+
+  testWidgets('7-day chart fits narrow columns with large text', (tester) async {
+    tester.view.physicalSize = const Size(700, 900);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2.5;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final study = StudyController(
+      store: MemoryStudyStore(),
+      chimes: NoopChimeScheduler(),
+      clock: () => DateTime(2026, 11, 20, 12),
+    );
+    await tester.runAsync(study.init);
+    await tester.runAsync(
+      () => study.setBlocks([
+        Block(
+          id: 'a',
+          name: '数学',
+          type: BlockType.study,
+          start: LogicalDay.toOffset(9, 0),
+          end: LogicalDay.toOffset(10, 30),
+        ),
+      ]),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StudyScope(controller: study, child: const StatsPage()),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('1時間30分'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     study.dispose();
