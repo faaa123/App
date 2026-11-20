@@ -52,13 +52,15 @@ class PresetsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    // Wraps the summary under the name in narrow windows.
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(
-                          child: Text(
-                            p.name,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                        Text(
+                          p.name,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
                           '${p.blocks.length}ブロック・勉強${formatMinutes(totalStudyMinutes(p.blocks))}',
@@ -71,7 +73,10 @@ class PresetsPage extends StatelessWidget {
                       children: [
                         for (var w = 0; w < 7; w++)
                           FilterChip(
-                            label: Text(_weekdayLabels[w]),
+                            label: Text(
+                              _weekdayLabels[w],
+                              semanticsLabel: '${_weekdayLabels[w]}曜日',
+                            ),
                             selected: p.weekdays.contains(w),
                             onSelected: (on) => c.setPresetWeekdays(
                               p.id,
@@ -98,13 +103,13 @@ class PresetsPage extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         FilledButton.tonal(
-                          child: const Text('読込'),
+                          child: const Text('読み込む'),
                           onPressed: () async {
                             final ok = await confirm(
                               context,
                               title: '「${p.name}」を読み込みますか？',
                               message: '現在のスケジュールを置き換えます。',
-                              ok: '読込',
+                              ok: '読み込む',
                             );
                             if (ok) await c.applyPreset(p.id);
                           },
