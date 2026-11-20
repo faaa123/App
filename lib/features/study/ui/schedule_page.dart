@@ -197,10 +197,18 @@ class _BlockTile extends StatelessWidget {
           backgroundColor: style.color,
           child: Icon(style.icon, color: style.onColor),
         ),
-        title: Text(block.name),
+        // Times lead (they are what a timetable is scanned for); the name
+        // shows only when it says more than the avatar's type.
+        title: Text(
+          '${LogicalDay.clock(block.start)} – ${LogicalDay.clock(block.end)}',
+          style: const TextStyle(
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
         subtitle: Text(
-          '${LogicalDay.clock(block.start)} – ${LogicalDay.clock(block.end)}'
-          '（${formatMinutes(block.duration)}）',
+          block.name == style.label
+              ? formatMinutes(block.duration)
+              : '${block.name}・${formatMinutes(block.duration)}',
         ),
         trailing: IconButton(
           tooltip: '削除',
