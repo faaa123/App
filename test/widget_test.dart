@@ -88,6 +88,42 @@ void main() {
     study.dispose();
   });
 
+  testWidgets('pomodoro names are not prefixed with their type again', (
+    tester,
+  ) async {
+    final study = StudyController(
+      store: MemoryStudyStore(),
+      chimes: NoopChimeScheduler(),
+      clock: () => DateTime(2026, 11, 20, 12, 10),
+    );
+    await tester.runAsync(study.init);
+    await tester.runAsync(
+      () => study.setBlocks([
+        Block(
+          id: 'a',
+          name: '勉強2',
+          type: BlockType.study,
+          start: LogicalDay.toOffset(12, 0),
+          end: LogicalDay.toOffset(12, 25),
+        ),
+        Block(
+          id: 'b',
+          name: '休憩2',
+          type: BlockType.rest,
+          start: LogicalDay.toOffset(12, 25),
+          end: LogicalDay.toOffset(12, 30),
+        ),
+      ]),
+    );
+    await tester.pumpWidget(App(study: study));
+    expect(find.text('勉強2'), findsOneWidget);
+    expect(find.textContaining('次：休憩2・'), findsOneWidget);
+    expect(find.textContaining('（休憩）'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    study.dispose();
+  });
+
   testWidgets('deleting a block can be undone', (tester) async {
     final study = StudyController(
       store: MemoryStudyStore(),

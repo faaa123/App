@@ -157,16 +157,19 @@ class _InBlockPanel extends StatelessWidget {
     final b = status.block;
     final style = BlockStyle.of(b.type);
     final next = status.next;
-    // Default names equal the type label; don't show them twice.
-    final title = b.name == style.label
-        ? style.label
+    // Names that already begin with the type label ('勉強', '勉強2') describe
+    // themselves; don't show the label twice.
+    final title = b.name.startsWith(style.label)
+        ? b.name
         : '${style.label}　${b.name}';
     final String? nextName;
     if (next == null) {
       nextName = null;
     } else {
       final label = BlockStyle.of(next.type).label;
-      nextName = next.name == label ? label : '${next.name}（$label）';
+      nextName = next.name.startsWith(label)
+          ? next.name
+          : '${next.name}（$label）';
     }
     return _Panel(
       color: style.color,
