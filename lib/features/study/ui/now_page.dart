@@ -134,19 +134,27 @@ class _InBlockPanel extends StatelessWidget {
     final b = status.block;
     final style = BlockStyle.of(b.type);
     final next = status.next;
+    // Default names equal the type label; don't show them twice.
+    final title = b.name == style.label ? style.label : '${style.label}　${b.name}';
+    final String? nextName;
+    if (next == null) {
+      nextName = null;
+    } else {
+      final label = BlockStyle.of(next.type).label;
+      nextName = next.name == label ? label : '${next.name}（$label）';
+    }
     return _Panel(
       color: style.color,
       onColor: style.onColor,
       icon: style.icon,
-      title: '${style.label}　${b.name}',
+      title: title,
       big: formatCountdown(status.remainingSeconds),
       caption: '〜${LogicalDay.clock(b.end)}',
       progress: status.progress,
       footer: next == null
           ? '本日最後のブロックです'
-          : '次：${next.name}'
-                '（${BlockStyle.of(next.type).label}・'
-                '${status.secondsUntilNext! <= status.remainingSeconds ? 'このあとすぐ' : 'あと${formatUntil(status.secondsUntilNext!)}'}）',
+          : '次：$nextName・'
+                '${status.secondsUntilNext! <= status.remainingSeconds ? 'このあとすぐ' : 'あと${formatUntil(status.secondsUntilNext!)}'}',
     );
   }
 }

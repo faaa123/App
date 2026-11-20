@@ -66,6 +66,8 @@ void main() {
     );
     await tester.pumpWidget(App(study: study));
     expect(tester.takeException(), isNull);
+    expect(find.text('勉強　数学の過去問演習'), findsOneWidget);
+    expect(find.text('次：休憩・このあとすぐ'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     study.dispose();
