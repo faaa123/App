@@ -60,11 +60,18 @@ class Preset {
       for (final w in weekdays)
         if (w is int && w >= 0 && w <= 6) w,
     };
+    var dropped = false;
+    final blocks = _parseBlocks(j['blocks'], () {
+      dropped = true;
+      onDrop?.call();
+    });
     final preset = Preset(
       id: j['id'] as String,
       name: j['name'] as String,
-      blocks: _parseBlocks(j['blocks'], onDrop),
-      weekdays: valid,
+      blocks: blocks,
+      // A preset that lost blocks must never auto-apply: it would silently
+      // replace (or empty) that day's schedule. It can still be applied by hand.
+      weekdays: dropped || blocks.isEmpty ? const {} : valid,
       updatedAt: DateTime.fromMillisecondsSinceEpoch(j['updatedAt'] as int),
     );
     if (valid.length != weekdays.length) onDrop?.call();

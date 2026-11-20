@@ -122,7 +122,7 @@ class _StatusPanel extends StatelessWidget {
         color: scheme.surfaceContainerHigh,
         onColor: scheme.onSurface,
         icon: Icons.hourglass_empty,
-        title: '予定なし',
+        title: 'フリー',
         seconds: s.secondsUntilNext,
         caption: '「${s.next.name}」が始まるまで',
       ),

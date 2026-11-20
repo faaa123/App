@@ -192,7 +192,8 @@ class StudyController extends ChangeNotifier {
   Preset? presetForWeekday(int weekday) {
     Preset? best;
     for (final p in _data.presets) {
-      if (p.weekdays.contains(weekday) &&
+      if (p.blocks.isNotEmpty &&
+          p.weekdays.contains(weekday) &&
           (best == null || p.updatedAt.isAfter(best.updatedAt))) {
         best = p;
       }

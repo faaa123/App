@@ -112,6 +112,8 @@ void main() {
   test('unlinking a weekday does not take over shared weekdays', () async {
     final c = make();
     await c.init();
+    // Presets come from a non-empty schedule (empty ones never auto-apply).
+    await c.addBlock(blk(c, 'x', BlockType.study, o(9, 0), o(10, 0)));
     await c.saveAsPreset('A');
     await c.saveAsPreset('B');
     final a = c.presets.firstWhere((p) => p.name == 'A').id;
@@ -250,10 +252,16 @@ void main() {
     expect(c.blocks.map((b) => b.name), ['ok']);
     expect(c.presets.map((p) => p.name), ['good']);
     expect(c.presets.single.blocks, isEmpty);
-    expect(c.presets.single.weekdays, {1});
+    // Lost its blocks → must not auto-apply.
+    expect(c.presets.single.weekdays, isEmpty);
     expect(c.threshold, 30);
     expect(c.minutesByDate().containsKey('x'), isFalse);
     expect(store.copies, ['partial']);
+
+    // Rolling over to Monday (the preset's old weekday) keeps the schedule.
+    clock = DateTime(2026, 11, 23, 9);
+    await c.refresh();
+    expect(c.blocks.map((b) => b.name), ['ok']);
     c.dispose();
   });
 

@@ -30,9 +30,6 @@ class NotificationChimeScheduler implements ChimeScheduler {
   List<Chime>? _pending;
   Future<void>? _draining;
 
-  /// Key of the plan currently registered with iOS.
-  String? _appliedKey;
-
   static const _details = NotificationDetails(
     iOS: DarwinNotificationDetails(
       presentAlert: true,
@@ -63,8 +60,7 @@ class NotificationChimeScheduler implements ChimeScheduler {
     return _draining ??= _drain();
   }
 
-  /// Applies only the newest pending plan, one at a time, and skips a plan
-  /// identical to the one already registered.
+  /// Applies only the newest pending plan, one at a time.
   Future<void> _drain() async {
     try {
       try {
@@ -73,14 +69,8 @@ class NotificationChimeScheduler implements ChimeScheduler {
       while (_pending != null) {
         final c = _pending!;
         _pending = null;
-        final key = _key(c);
-        if (key == _appliedKey && await _stillRegistered(c)) continue;
         try {
-          _appliedKey = null;
-          await _replace(c);
-          // iOS silently drops requests while notifications are off, so only
-          // remember the plan once they are on (a later resume re-applies).
-          if (await _enabled()) _appliedKey = key;
+          await _sync(c);
         } catch (_) {}
       }
     } finally {
@@ -90,50 +80,63 @@ class NotificationChimeScheduler implements ChimeScheduler {
     }
   }
 
-  /// False when iOS holds fewer requests than the plan's future chimes
-  /// (e.g. they were dropped while notifications were disabled).
-  Future<bool> _stillRegistered(List<Chime> chimes) async {
-    try {
-      final now = DateTime.now();
-      final future = chimes.where((c) => c.at.isAfter(now)).length;
-      return (await _plugin.pendingNotificationRequests()).length >= future;
-    } catch (_) {
-      return false;
+  /// Makes iOS hold exactly [chimes], touching only what differs. Ids are
+  /// derived from each chime's content, so a resume after some chimes fired
+  /// only adds the new tail instead of rewriting everything. If iOS dropped
+  /// requests (e.g. notifications were off), they are simply added again.
+  Future<void> _sync(List<Chime> chimes) async {
+    final pending = {
+      for (final r in await _plugin.pendingNotificationRequests()) r.id,
+    };
+    final diff = diffChimes(pending, chimes);
+    for (final id in diff.cancel) {
+      await _plugin.cancel(id: id);
+    }
+    for (final (id, c) in diff.add) {
+      await _schedule(id, c);
     }
   }
 
-  Future<bool> _enabled() async {
-    try {
-      final ios = _plugin
-          .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin
-          >();
-      if (ios == null) return true;
-      return (await ios.checkPermissions())?.isEnabled ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<void> _schedule(int id, Chime c) => _plugin.zonedSchedule(
+    id: id,
+    // Absolute instant; UTC avoids needing the tz database.
+    scheduledDate: tz.TZDateTime.from(c.at.toUtc(), tz.UTC),
+    notificationDetails: _details,
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    title: c.next.isStudy ? '勉強の時間です' : '休憩の時間です',
+    body: '${c.next.name}（〜${LogicalDay.clock(c.next.end)}）',
+  );
+}
 
-  static String _key(List<Chime> chimes) => [
-    for (final c in chimes)
+/// Stable 31-bit id for a chime's content (FNV-1a).
+int chimeId(Chime c) {
+  final key =
       '${c.at.millisecondsSinceEpoch}|${c.next.name}|'
-          '${c.next.type.name}|${c.next.end}',
-  ].join(',');
-
-  Future<void> _replace(List<Chime> chimes) async {
-    await _plugin.cancelAll();
-    for (var i = 0; i < chimes.length; i++) {
-      final c = chimes[i];
-      await _plugin.zonedSchedule(
-        id: i,
-        // Absolute instant; UTC avoids needing the tz database.
-        scheduledDate: tz.TZDateTime.from(c.at.toUtc(), tz.UTC),
-        notificationDetails: _details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        title: c.next.isStudy ? '勉強の時間です' : '休憩の時間です',
-        body: '${c.next.name}（〜${LogicalDay.clock(c.next.end)}）',
-      );
-    }
+      '${c.next.type.name}|${c.next.end}';
+  var h = 0x811c9dc5;
+  for (final unit in key.codeUnits) {
+    h = ((h ^ unit) * 0x01000193) & 0xFFFFFFFF;
   }
+  return h & 0x7FFFFFFF;
+}
+
+/// What to cancel and what to add so that [pendingIds] matches [chimes].
+({List<int> cancel, List<(int, Chime)> add}) diffChimes(
+  Set<int> pendingIds,
+  List<Chime> chimes,
+) {
+  final wanted = <int, Chime>{};
+  for (final c in chimes) {
+    wanted.putIfAbsent(chimeId(c), () => c);
+  }
+  return (
+    cancel: [
+      for (final id in pendingIds)
+        if (!wanted.containsKey(id)) id,
+    ],
+    add: [
+      for (final e in wanted.entries)
+        if (!pendingIds.contains(e.key)) (e.key, e.value),
+    ],
+  );
 }

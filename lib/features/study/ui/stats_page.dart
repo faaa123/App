@@ -118,55 +118,63 @@ class _PeriodCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  for (final (_, minutes) in days)
+                  for (final (date, minutes) in days)
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        // The bar takes what the one-line label leaves, so
-                        // narrow columns or large text never overflow.
-                        child: LayoutBuilder(
-                          builder: (context, box) => Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              if (showLabels && minutes > 0)
-                                SizedBox(
-                                  height: 16,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      formatMinutes(minutes),
-                                      maxLines: 1,
-                                      style: text.labelSmall,
+                      // One spoken item per day: date, time, goal met.
+                      child: Semantics(
+                        label:
+                            '${date.month}月${date.day}日 ${formatMinutes(minutes)}'
+                            '${minutes >= threshold ? '、達成' : ''}',
+                        child: ExcludeSemantics(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            // The bar takes what the one-line label leaves, so
+                            // narrow columns or large text never overflow.
+                            child: LayoutBuilder(
+                              builder: (context, box) => Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  if (showLabels && minutes > 0)
+                                    SizedBox(
+                                      height: 16,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          formatMinutes(minutes),
+                                          maxLines: 1,
+                                          style: text.labelSmall,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    height: max(
+                                      2,
+                                      min(120.0, box.maxHeight - 20) *
+                                          minutes /
+                                          peak,
+                                    ),
+                                    // Missed days: same hue, outlined, so they
+                                    // differ by shape as well as by color.
+                                    decoration: BoxDecoration(
+                                      color: minutes >= threshold
+                                          ? BlockStyle.study.mark
+                                          : BlockStyle.study.mark.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                      border: minutes >= threshold
+                                          ? null
+                                          : Border.all(
+                                              color: BlockStyle.study.mark,
+                                            ),
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(4),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              const SizedBox(height: 4),
-                              Container(
-                                height: max(
-                                  2,
-                                  min(120.0, box.maxHeight - 20) *
-                                      minutes /
-                                      peak,
-                                ),
-                                // Missed days: same hue, outlined, so they
-                                // differ by shape as well as by color.
-                                decoration: BoxDecoration(
-                                  color: minutes >= threshold
-                                      ? BlockStyle.study.mark
-                                      : BlockStyle.study.mark.withValues(
-                                          alpha: 0.3,
-                                        ),
-                                  border: minutes >= threshold
-                                      ? null
-                                      : Border.all(
-                                          color: BlockStyle.study.mark,
-                                        ),
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(4),
-                                  ),
-                                ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -176,20 +184,23 @@ class _PeriodCard extends StatelessWidget {
             ),
             if (showLabels) ...[
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  for (final (date, _) in days)
-                    Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '${date.month}/${date.day}',
-                          maxLines: 1,
-                          style: text.labelSmall,
+              // Already read with each bar above.
+              ExcludeSemantics(
+                child: Row(
+                  children: [
+                    for (final (date, _) in days)
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${date.month}/${date.day}',
+                            maxLines: 1,
+                            style: text.labelSmall,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ],
           ],
