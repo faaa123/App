@@ -165,6 +165,33 @@ public final class StudyController {
         return best
     }
 
+    // MARK: - undo
+
+    /// What the user edits directly: the schedule and the presets. Restoring a
+    /// snapshot never touches history (summaries) or the rollover state.
+    public struct Snapshot: Equatable, Sendable {
+        public let blocks: [Block]
+        public let presets: [Preset]
+    }
+
+    public var snapshot: Snapshot { Snapshot(blocks: data.blocks, presets: data.presets) }
+
+    public func restore(_ s: Snapshot) {
+        data.blocks = s.blocks
+        data.presets = s.presets
+        commit()
+    }
+
+    /// Weekdays (0 = Sunday …) that more than one preset claims, with the
+    /// preset that wins there.
+    public func contestedWeekdays() -> [(weekday: Int, winner: Preset)] {
+        (0..<7).compactMap { w in
+            let claimants = data.presets.filter { !$0.blocks.isEmpty && $0.weekdays.contains(w) }
+            guard claimants.count > 1, let winner = presetForWeekday(w) else { return nil }
+            return (w, winner)
+        }
+    }
+
     // MARK: - stats
 
     public func setThreshold(_ minutes: Int) {

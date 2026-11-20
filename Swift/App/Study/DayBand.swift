@@ -6,38 +6,46 @@ import SwiftUI
 /// `blocks` must be sorted by start (as `StudyController.blocks` is).
 struct DayBand: View {
     let blocks: [Block]
+    /// Minutes since 4:00; outside the band (e.g. -1) draws no "now" line.
     let nowOffset: Int
+    var showsLabels = true
+    var height: CGFloat = 40
+    var accessibilityPrefix = "今日"
 
     /// Distance kept between label centres (and from the end labels).
     private static let minLabelGap: CGFloat = 56
 
     var body: some View {
-        let from = blocks.first!.start, to = blocks.last!.end
-        VStack(spacing: 6) {
-            Canvas { ctx, size in draw(ctx, size, from: from, to: to) }
-                .frame(height: 40)
-                .accessibilityElement()
-                .accessibilityLabel("本日 \(LogicalDay.clock(from))〜\(LogicalDay.clock(to))、\(blocks.count)ブロック")
-            GeometryReader { geo in
-                let w = geo.size.width
-                ZStack(alignment: .topLeading) {
-                    HStack {
-                        Text(LogicalDay.clock(from))
-                        Spacer()
-                        Text(LogicalDay.clock(to))
+        if let first = blocks.first, let last = blocks.last {
+            let from = first.start, to = last.end
+            VStack(spacing: 6) {
+                Canvas { ctx, size in draw(ctx, size, from: from, to: to) }
+                    .frame(height: height)
+                    .accessibilityElement()
+                    .accessibilityLabel("\(accessibilityPrefix) \(LogicalDay.clock(from))〜\(LogicalDay.clock(to))、\(blocks.count)ブロック")
+                if showsLabels {
+                    GeometryReader { geo in
+                        let w = geo.size.width
+                        ZStack(alignment: .topLeading) {
+                            HStack {
+                                Text(LogicalDay.clock(from))
+                                Spacer()
+                                Text(LogicalDay.clock(to))
+                            }
+                            ForEach(marks(from: from, to: to, width: w)) { m in
+                                Text(LogicalDay.clock(m.id))
+                                    .font(.caption2)
+                                    .fixedSize()
+                                    .position(x: m.x, y: 8)
+                            }
+                        }
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     }
-                    ForEach(marks(from: from, to: to, width: w)) { m in
-                        Text(LogicalDay.clock(m.id))
-                            .font(.caption2)
-                            .fixedSize()
-                            .position(x: m.x, y: 8)
-                            .accessibilityHidden(true)
-                    }
+                    .frame(height: 18)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
-            .frame(height: 18)
         }
     }
 
@@ -76,7 +84,7 @@ struct DayBand: View {
             var p = Path()
             p.move(to: CGPoint(x: x(h), y: 0))
             p.addLine(to: CGPoint(x: x(h), y: size.height))
-            ctx.stroke(p, with: .color(.white.opacity(0.25)), lineWidth: 1)
+            ctx.stroke(p, with: .style(HierarchicalShapeStyle.quaternary), lineWidth: 1)
         }
         for b in blocks {
             let color = BlockStyle.of(b.type).mark
@@ -102,7 +110,7 @@ struct DayBand: View {
             var p = Path()
             p.move(to: CGPoint(x: x(nowOffset), y: -4))
             p.addLine(to: CGPoint(x: x(nowOffset), y: size.height + 4))
-            ctx.stroke(p, with: .color(.white), lineWidth: 2)
+            ctx.stroke(p, with: .style(HierarchicalShapeStyle.primary), lineWidth: 2)
         }
     }
 }

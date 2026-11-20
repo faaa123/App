@@ -3,24 +3,42 @@ import SwiftUI
 
 @main
 struct StudyApp: SwiftUI.App {
-    @State private var study = StudyApp.makeController()
+    @State private var study: StudyController
+    @State private var undo: ScheduleUndo
+    @State private var router = AppRouter()
+    @State private var chimes: NotificationChimeScheduler
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        let chimes = NotificationChimeScheduler()
+        let study = StudyApp.makeController(chimes: chimes)
+        _chimes = State(initialValue: chimes)
+        _study = State(initialValue: study)
+        _undo = State(initialValue: ScheduleUndo(study: study))
+    }
 
     var body: some Scene {
         WindowGroup {
+            // Follows the system appearance (HIG: no app-specific setting);
+            // both appearances are designed, dark first.
             RootView()
                 .environment(study)
-                .preferredColorScheme(.dark)
+                .environment(router)
+                .environment(chimes)
+                .environment(undo)
                 .task { await runDayTimer() }
         }
         .onChange(of: scenePhase) { _, phase in
             // On resume: finalize past days, apply the weekday preset, re-plan.
-            if phase == .active { study.refresh() }
+            if phase == .active {
+                study.refresh()
+                chimes.refreshAuthorization()
+            }
         }
     }
 
     @MainActor
-    static func makeController() -> StudyController {
+    static func makeController(chimes: any ChimeScheduler) -> StudyController {
         let store: any StudyStore
         do {
             store = try FileStudyStore.applicationSupport()
@@ -28,7 +46,7 @@ struct StudyApp: SwiftUI.App {
             print("Application Support unavailable, data will not persist: \(error)")
             store = MemoryStudyStore()
         }
-        let c = StudyController(store: store, chimes: NotificationChimeScheduler()) { Instant(Date()) }
+        let c = StudyController(store: store, chimes: chimes) { Instant(Date()) }
         c.load()
         return c
     }

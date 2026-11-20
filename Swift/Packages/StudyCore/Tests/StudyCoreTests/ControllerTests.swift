@@ -278,3 +278,39 @@ func blk(_ c: StudyController, _ name: String, _ t: BlockType, _ s: Int, _ e: In
         #expect(c.threshold == 10)
     }
 }
+
+@MainActor
+@Suite struct UndoSnapshotTests {
+    @Test func restoreBringsBackBlocksAndPresetsOnly() {
+        let env = Env()
+        let c = env.make()
+        c.addBlock(blk(c, "a", .study, o(9, 0), o(10, 0)))
+        c.saveAsPreset(name: "p")
+        let before = c.snapshot
+        let minutes = c.minutesByDate()
+        c.deleteAll()
+        c.deletePreset(id: c.presets[0].id)
+        #expect(c.blocks.isEmpty && c.presets.isEmpty)
+        let calls = env.chimes.calls
+        c.restore(before)
+        #expect(c.snapshot == before)
+        #expect(c.minutesByDate() == minutes)
+        #expect(env.chimes.calls == calls + 1) // re-planned
+        // Persisted.
+        #expect(env.make().blocks.map(\.name) == ["a"])
+    }
+
+    @Test func contestedWeekdaysNameTheWinner() {
+        let env = Env()
+        let c = env.make()
+        c.addBlock(blk(c, "x", .study, o(9, 0), o(10, 0)))
+        c.saveAsPreset(name: "A")
+        c.saveAsPreset(name: "B")
+        c.setPresetWeekdays(id: c.presets[0].id, [1, 2])
+        env.advance(minutes: 1)
+        c.setPresetWeekdays(id: c.presets[1].id, [2, 3])
+        let contested = c.contestedWeekdays()
+        #expect(contested.map(\.weekday) == [2])
+        #expect(contested.first?.winner.name == "B")
+    }
+}

@@ -31,7 +31,7 @@ struct OffsetPicker: View {
     private static let calendar = Calendar(identifier: .gregorian)
 }
 
-/// −/+ minutes in steps of 5.
+/// −/+ minutes.
 struct MinuteStepper: View {
     let label: String
     @Binding var value: Int
@@ -40,13 +40,18 @@ struct MinuteStepper: View {
 
     var body: some View {
         Stepper(value: $value, in: range, step: step) {
-            LabeledContent(label, value: "\(value)分")
+            LabeledContent(label) {
+                Text(Format.minutes(value)).monospacedDigit()
+            }
         }
-        .accessibilityValue("\(value)分")
+        .accessibilityValue(Format.minutes(value))
     }
 }
 
-/// A short message at the bottom, optionally with an action (元に戻す).
+/// A short confirmation at the bottom of the screen, optionally with an
+/// action (取り消す). It is a transient control, so it floats on Liquid
+/// Glass. It does not time out while VoiceOver is running (HIG: avoid
+/// time-limited UI).
 struct ToastMessage: Identifiable {
     let id = UUID()
     let text: String
@@ -56,12 +61,15 @@ struct ToastMessage: Identifiable {
 
 private struct ToastOverlay: ViewModifier {
     @Binding var toast: ToastMessage?
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
             if let t = toast {
                 HStack(spacing: 16) {
-                    Text(t.text).lineLimit(3)
+                    Text(t.text)
+                        .lineLimit(3)
+                        .frame(maxWidth: 420, alignment: .leading)
                     if let label = t.actionLabel, let action = t.action {
                         Button(label) {
                             toast = nil
@@ -69,20 +77,23 @@ private struct ToastOverlay: ViewModifier {
                         }
                         .buttonStyle(.glassProminent)
                     }
+                    Button("閉じる", systemImage: "xmark") { toast = nil }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+                .padding(.vertical, 10)
                 .glassEffect(.regular, in: .capsule)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .id(t.id)
                 .task(id: t.id) {
-                    try? await Task.sleep(for: .seconds(t.action == nil ? 4 : 6))
-                    if toast?.id == t.id { toast = nil }
-                }
-                .onAppear {
                     UIAccessibility.post(notification: .announcement, argument: t.text)
+                    guard !voiceOver else { return }
+                    try? await Task.sleep(for: .seconds(t.action == nil ? 4 : 8))
+                    if toast?.id == t.id { toast = nil }
                 }
             }
         }
@@ -93,5 +104,26 @@ private struct ToastOverlay: ViewModifier {
 extension View {
     func toast(_ toast: Binding<ToastMessage?>) -> some View {
         modifier(ToastOverlay(toast: toast))
+    }
+}
+
+/// Explains why no chime will sound, with a way to fix it.
+struct ChimePermissionNotice: View {
+    @Environment(NotificationChimeScheduler.self) private var chimes
+
+    var body: some View {
+        if chimes.permission == .denied {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Image(systemName: "bell.slash.fill")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("通知がオフのため、チャイムは鳴りません")
+                        .font(.subheadline.weight(.semibold))
+                    Button("設定で通知をオンにする") { chimes.openSettings() }
+                        .font(.subheadline)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
     }
 }

@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 import StudyCore
+import UIKit
 import UserNotifications
 
 /// Study⇄rest chimes as local notifications with sound, delivered even when
@@ -10,27 +12,49 @@ import UserNotifications
 /// Flutter app), so a re-plan only touches what differs: after some chimes
 /// fired only the new tail is added, and requests iOS dropped (notifications
 /// were off) are simply added again.
+///
+/// Permission is asked the first time there is something to chime (HIG: ask
+/// in context, not at launch).
 @MainActor
+@Observable
 final class NotificationChimeScheduler: ChimeScheduler {
+    enum Permission { case unknown, notDetermined, allowed, denied }
+
+    /// Observed by the screens that explain why no chime will sound.
+    private(set) var permission: Permission = .unknown
+
     // Completion handlers below are @Sendable: UserNotifications calls them on
     // its own queue, and a main-actor closure there would trap in Swift 6.
-    private let center = UNUserNotificationCenter.current()
-    private let presenter = ForegroundPresenter()
-    private var ready: Task<Void, Never>?
+    @ObservationIgnored private let center = UNUserNotificationCenter.current()
+    @ObservationIgnored private let presenter = ForegroundPresenter()
     /// Latest plan not yet applied; earlier unapplied plans are dropped.
-    private var pendingPlan: [Chime]?
-    private var draining = false
+    @ObservationIgnored private var pendingPlan: [Chime]?
+    @ObservationIgnored private var draining = false
+
+    static let categoryId = "chime"
 
     init() {
         // Sound and banner while the app is in front, too.
         center.delegate = presenter
-        ready = Task {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                center.requestAuthorization(options: [.alert, .sound]) { @Sendable _, error in
-                    if let error { print("notification permission failed: \(error)") }
-                    cont.resume()
-                }
-            }
+        // With previews hidden (lock screen), show a neutral line instead of
+        // the block name.
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: Self.categoryId, actions: [], intentIdentifiers: [],
+                                   hiddenPreviewsBodyPlaceholder: "勉強と休憩の切り替え",
+                                   options: []),
+        ])
+        refreshAuthorization()
+    }
+
+    /// Re-reads the permission (the user may have changed it in Settings).
+    func refreshAuthorization() {
+        Task { permission = await currentPermission() }
+    }
+
+    /// Opens this app's notification settings.
+    func openSettings() {
+        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+            UIApplication.shared.open(url)
         }
     }
 
@@ -39,13 +63,39 @@ final class NotificationChimeScheduler: ChimeScheduler {
         guard !draining else { return }
         draining = true
         Task {
-            await ready?.value
             // Applies only the newest plan, one at a time.
             while let plan = pendingPlan {
                 pendingPlan = nil
+                if !plan.isEmpty { await askIfNeeded() }
                 await sync(plan)
             }
             draining = false
+        }
+    }
+
+    private func askIfNeeded() async {
+        guard await currentPermission() == .notDetermined else { return }
+        let center = center
+        _ = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            center.requestAuthorization(options: [.alert, .sound]) { @Sendable granted, error in
+                if let error { print("notification permission failed: \(error)") }
+                cont.resume(returning: granted)
+            }
+        }
+        permission = await currentPermission()
+    }
+
+    private func currentPermission() async -> Permission {
+        let center = center
+        let status = await withCheckedContinuation { (cont: CheckedContinuation<UNAuthorizationStatus, Never>) in
+            center.getNotificationSettings { @Sendable settings in
+                cont.resume(returning: settings.authorizationStatus)
+            }
+        }
+        switch status {
+        case .notDetermined: return .notDetermined
+        case .denied: return .denied
+        default: return .allowed
         }
     }
 
@@ -62,12 +112,15 @@ final class NotificationChimeScheduler: ChimeScheduler {
         let foreign = identifiers.filter { Int($0) == nil }
         let diff = diffChimes(pendingIds: Set(identifiers.compactMap { Int($0) }), wanted: wanted)
         let cancel = foreign + diff.cancel.map(String.init)
+        let center = center
         if !cancel.isEmpty { center.removePendingNotificationRequests(withIdentifiers: cancel) }
         for (id, (chime, at)) in diff.add {
             let content = UNMutableNotificationContent()
             content.title = chime.title
             content.body = chime.body
             content.sound = .default
+            content.categoryIdentifier = Self.categoryId
+            content.threadIdentifier = Self.categoryId
             let interval = at.timeIntervalSinceNow
             guard interval > 0 else { continue }
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
@@ -82,7 +135,8 @@ final class NotificationChimeScheduler: ChimeScheduler {
     }
 
     private func pendingIdentifiers() async -> [String] {
-        await withCheckedContinuation { cont in
+        let center = center
+        return await withCheckedContinuation { cont in
             center.getPendingNotificationRequests { @Sendable requests in
                 cont.resume(returning: requests.map(\.identifier))
             }

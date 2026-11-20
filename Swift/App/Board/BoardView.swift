@@ -4,7 +4,10 @@ import UIKit
 
 /// Temporary whiteboard: full screen, Apple Pencil draws, fingers pan and zoom,
 /// nothing is saved. Intentionally minimal (the user wants no more features).
-/// The tab bar stays hidden until the menu button asks for it.
+/// The tab bar stays hidden until the menu button asks for it (HIG: hidden
+/// navigation must be easy to bring back). The floating buttons are controls
+/// above content, so they use Liquid Glass; they sit in the top corners,
+/// away from a writing hand of either side.
 struct BoardView: View {
     @State private var board = BoardHandle()
     @State private var showTabBar = false
@@ -13,7 +16,7 @@ struct BoardView: View {
         BoardCanvas(handle: board)
             .ignoresSafeArea()
             .overlay(alignment: .topLeading) {
-                Button(showTabBar ? "メニューを隠す" : "メニュー",
+                Button(showTabBar ? "タブバーを隠す" : "タブバーを表示",
                        systemImage: showTabBar ? "xmark" : "square.grid.2x2") {
                     withAnimation { showTabBar.toggle() }
                 }
@@ -25,15 +28,18 @@ struct BoardView: View {
             .overlay(alignment: .topTrailing) {
                 HStack(spacing: 8) {
                     Button("ツール", systemImage: "pencil.tip.crop.circle") { board.toggleTools() }
-                    Button("元に戻す", systemImage: "arrow.uturn.backward") { board.undo() }
+                        .help("ツールパレットを表示")
+                    Button("取り消す", systemImage: "arrow.uturn.backward") { board.undo() }
+                        .help("取り消す（⌘Z）")
                     Button("全消去", systemImage: "trash") { board.clear() }
+                        .help("全消去（取り消せます）")
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.glass)
                 .controlSize(.large)
                 .padding(12)
             }
-            // Black ink on white even though the app is dark.
+            // Black ink on white in either appearance.
             .environment(\.colorScheme, .light)
             .toolbarVisibility(showTabBar ? .visible : .hidden, for: .tabBar)
             .onAppear { showTabBar = false }
@@ -131,8 +137,28 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
         toolPicker.setVisible(false, forFirstResponder: canvas)
     }
 
+    /// Erases everything, undoably (⌘Z or the undo button brings it back).
     func clear() {
-        canvas.drawing = PKDrawing()
+        guard !canvas.drawing.strokes.isEmpty else { return }
+        swapDrawing(to: PKDrawing(), actionName: "全消去")
+    }
+
+    /// Drawings replaced by clear(), keyed by undo step. The undo handler
+    /// captures only the key, so it stays Sendable.
+    private var replaced: [UUID: PKDrawing] = [:]
+
+    private func swapDrawing(to new: PKDrawing, actionName: String) {
+        let token = UUID()
+        replaced[token] = canvas.drawing
+        canvas.drawing = new
+        guard let um = canvas.undoManager else { return }
+        um.registerUndo(withTarget: self) { vc in
+            MainActor.assumeIsolated {
+                guard let old = vc.replaced.removeValue(forKey: token) else { return }
+                vc.swapDrawing(to: old, actionName: actionName) // registers redo
+            }
+        }
+        um.setActionName(actionName)
     }
 
     func undo() {

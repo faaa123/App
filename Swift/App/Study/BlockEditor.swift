@@ -1,11 +1,14 @@
 import StudyCore
 import SwiftUI
 
-/// Add a block (`editing == nil`) or edit one, in a sheet. The whole schedule
-/// after the edit is previewed live, including blocks moved by a cascade.
+/// Add a block (`editing == nil`) or edit one, in a form sheet. The whole
+/// schedule after the edit is previewed live, including the blocks a cascade
+/// would move, so nothing changes unexpectedly on save.
 struct BlockEditor: View {
     let editing: Block?
     @Environment(StudyController.self) private var study
+    @Environment(ScheduleUndo.self) private var undo
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -14,7 +17,17 @@ struct BlockEditor: View {
     @State private var end = 0
     @State private var cascade = false
     @State private var newId = ""
-    @State private var loaded = false
+    @State private var initial: Draft?
+    @State private var confirmDiscard = false
+    @State private var confirmDelete = false
+    @FocusState private var nameFocused: Bool
+
+    private struct Draft: Equatable {
+        var name: String, type: BlockType, start: Int, end: Int, cascade: Bool
+    }
+
+    private var draft: Draft { Draft(name: name, type: type, start: start, end: end, cascade: cascade) }
+    private var hasChanges: Bool { initial != nil && draft != initial }
 
     var body: some View {
         // The schedule can change underneath (4:00 rollover, weekday preset);
@@ -29,32 +42,58 @@ struct BlockEditor: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    TextField("名前（空なら「\(BlockStyle.of(type).label)」）", text: $name)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
                 Section {
+                    TextField("名前", text: $name, prompt: Text(BlockStyle.of(type).label))
+                        .focused($nameFocused)
+                        .submitLabel(.done)
+                } header: {
+                    Text("名前")
+                } footer: {
+                    Text("空のときは「\(BlockStyle.of(type).label)」になります。")
+                }
+                Section("時間") {
                     OffsetPicker(label: "開始", offset: $start, isEnd: false)
                     OffsetPicker(label: "終了", offset: $end, isEnd: true)
+                    LabeledContent("長さ") {
+                        Text(end > start ? Format.minutes(end - start) : "—")
+                            .monospacedDigit()
+                    }
                 }
                 if editing != nil {
                     Section {
-                        Picker("時刻の変更", selection: $cascade) {
-                            Text("このブロックのみ変更").tag(false)
-                            Text("以降のブロックも同じ幅だけずらす").tag(true)
+                        Picker("時刻を変えたとき", selection: $cascade) {
+                            Text("このブロックだけ変える").tag(false)
+                            Text("後ろのブロックも同じだけずらす").tag(true)
                         }
                         .pickerStyle(.inline)
                         .labelsHidden()
+                    } header: {
+                        Text("後ろのブロック")
                     }
                     let moved = shifted(result)
                     if !moved.isEmpty {
-                        Section("連動して動くブロック") {
+                        Section("一緒にずれるブロック") {
                             ForEach(moved, id: \.self) { Text($0).monospacedDigit() }
                         }
                     }
                 }
                 if case .failure(let e) = result {
                     Section {
-                        Label(e.message, systemImage: "exclamationmark.triangle")
+                        Text(e.message)
                             .foregroundStyle(.red)
+                    }
+                }
+                if let e = editing {
+                    Section {
+                        Button("このブロックを削除", role: .destructive) { confirmDelete = true }
+                            .frame(maxWidth: .infinity)
+                            .confirmationDialog("「\(e.name)」を削除しますか？", isPresented: $confirmDelete,
+                                                titleVisibility: .visible) {
+                                Button("削除", role: .destructive) { delete(e) }
+                            }
                     }
                 }
             }
@@ -62,20 +101,27 @@ struct BlockEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル", role: .cancel) { dismiss() }
+                    Button("キャンセル", role: .cancel) { cancel() }
+                        .confirmationDialog("変更を破棄しますか？", isPresented: $confirmDiscard) {
+                            Button("変更を破棄", role: .destructive) { dismiss() }
+                            Button("編集を続ける", role: .cancel) {}
+                        }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存", systemImage: "checkmark") { save() }
+                    Button("保存", role: .confirm) { save() }
                         .disabled(!isOk(result))
+                        .keyboardShortcut(.defaultAction)
                 }
             }
         }
+        .presentationSizing(.form)
+        // Swiping down with unsaved changes asks first (HIG: sheets).
+        .interactiveDismissDisabled(hasChanges)
         .onAppear(perform: load)
     }
 
     private func load() {
-        guard !loaded else { return }
-        loaded = true
+        guard initial == nil else { return }
         newId = study.newId()
         if let e = editing {
             name = e.name
@@ -89,6 +135,7 @@ struct BlockEditor: View {
             start = s
             end = min(max(s + 30, s + 1), LogicalDay.minutesPerDay)
         }
+        initial = draft
     }
 
     private var effectiveName: String {
@@ -96,13 +143,15 @@ struct BlockEditor: View {
         return n.isEmpty ? BlockStyle.of(type).label : n
     }
 
+    private static let orderError = ScheduleError("終了は開始より後にしてください（翌朝4:00まで）")
+
     /// The whole schedule after this edit, or an error.
     private func preview() -> EditResult {
         let blocks = study.blocks
-        guard end > start else { return .failure(ScheduleError("終了は開始より後にしてください（翌4:00まで）")) }
+        guard end > start else { return .failure(Self.orderError) }
         guard let e = editing else {
             guard let added = Block.validated(id: newId, name: effectiveName, type: type, start: start, end: end) else {
-                return .failure(ScheduleError("終了は開始より後にしてください（翌4:00まで）"))
+                return .failure(Self.orderError)
             }
             let next = blocks + [added]
             if let err = validateSchedule(next) { return .failure(ScheduleError(err)) }
@@ -129,10 +178,21 @@ struct BlockEditor: View {
         }
     }
 
+    private func cancel() {
+        if hasChanges { confirmDiscard = true } else { dismiss() }
+    }
+
     private func save() {
         // Recomputed against the current schedule at the moment of saving.
         guard case .success(let blocks) = preview() else { return }
-        study.setBlocks(blocks)
+        undo.perform(editing == nil ? "ブロックを追加" : "ブロックを編集", undoManager: undoManager) {
+            study.setBlocks(blocks)
+        }
+        dismiss()
+    }
+
+    private func delete(_ b: Block) {
+        undo.perform("ブロックを削除", undoManager: undoManager) { study.deleteBlock(id: b.id) }
         dismiss()
     }
 }
@@ -140,6 +200,8 @@ struct BlockEditor: View {
 /// Fill a time range with study/rest repeats.
 struct PomodoroSheet: View {
     @Environment(StudyController.self) private var study
+    @Environment(ScheduleUndo.self) private var undo
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
     @State private var start = 0
     @State private var end = 0
@@ -151,39 +213,51 @@ struct PomodoroSheet: View {
         let generated = pomodoroFill(start: start, end: end, studyMinutes: studyMinutes,
                                      restMinutes: restMinutes) { UUID().uuidString.lowercased() }
         let err = end <= start
-            ? "終了は開始より後にしてください（翌4:00まで）"
+            ? "終了は開始より後にしてください（翌朝4:00まで）"
             : validateSchedule(study.blocks + generated)
         NavigationStack {
             Form {
-                Section {
+                Section("時間") {
                     OffsetPicker(label: "開始", offset: $start, isEnd: false)
                     OffsetPicker(label: "終了", offset: $end, isEnd: true)
                 }
                 Section {
                     MinuteStepper(label: "勉強", value: $studyMinutes, range: 5...180)
                     MinuteStepper(label: "休憩", value: $restMinutes, range: 0...60)
+                } footer: {
+                    Text("休憩を0分にすると、勉強のブロックだけを並べます。")
                 }
                 Section {
+                    if !generated.isEmpty {
+                        DayBand(blocks: generated, nowOffset: -1, showsLabels: false)
+                            .accessibilityHidden(true)
+                    }
                     Text("\(generated.count)個のブロック（勉強\(Format.minutes(totalStudyMinutes(generated)))）を追加します")
                     if let err {
-                        Label(err, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                        Text(err).foregroundStyle(.red)
                     }
                 }
             }
-            .navigationTitle("ポモドーロで敷き詰める")
+            .navigationTitle("ポモドーロ")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル", role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("追加", systemImage: "checkmark") {
-                        if study.addBlocks(generated) == nil { dismiss() }
+                    Button("追加", role: .confirm) {
+                        var failed = false
+                        undo.perform("ポモドーロ", undoManager: undoManager) {
+                            failed = study.addBlocks(generated) != nil
+                        }
+                        if !failed { dismiss() }
                     }
                     .disabled(err != nil || generated.isEmpty)
+                    .keyboardShortcut(.defaultAction)
                 }
             }
         }
+        .presentationSizing(.form)
         .onAppear {
             guard !loaded else { return }
             loaded = true
