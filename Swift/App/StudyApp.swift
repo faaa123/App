@@ -28,6 +28,7 @@ struct StudyApp: SwiftUI.App {
                 .environment(undo)
                 .task { await runDayTimer() }
         }
+        .commands { AppCommands(router: router) }
         .onChange(of: scenePhase) { _, phase in
             // On resume: finalize past days, apply the weekday preset, re-plan.
             if phase == .active {

@@ -21,7 +21,7 @@ public struct ScheduleError: Error, Equatable, Sendable {
 }
 
 private func rangeError(_ name: String) -> ScheduleError {
-    ScheduleError("「\(name)」が1日の区切り（翌朝4:00）を越えるか、不正な時刻です")
+    ScheduleError("「\(name)」の時間が1日の区切り（翌朝4:00）を越えています")
 }
 
 private func validRange(_ s: Int, _ e: Int) -> Bool {
@@ -58,7 +58,7 @@ public func applyCascadeShift(_ blocks: [Block], id: String, newStart: Int, newE
             e += shift
         }
         guard validRange(s, e) else {
-            return .failure(ScheduleError("「\(b.name)」が1日の区切り（翌朝4:00）を越えるか、開始前になります"))
+            return .failure(ScheduleError("ずらすと「\(b.name)」が1日の区切り（翌朝4:00）を越えます"))
         }
         updated.append(b.with(start: s, end: e))
     }

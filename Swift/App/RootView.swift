@@ -11,6 +11,33 @@ enum AppTab: Hashable {
 @Observable
 final class AppRouter {
     var tab: AppTab = .now
+    /// Set by the ブロックを追加 command (⌘N); the schedule screen opens its
+    /// editor and clears it (also when it first appears).
+    var addBlockPending = false
+
+    func requestAddBlock() {
+        tab = .schedule
+        addBlockPending = true
+    }
+}
+
+/// Menu bar commands (iPadOS 26 shows them in the menu bar and the ⌘ key
+/// overlay).
+struct AppCommands: Commands {
+    let router: AppRouter
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("ブロックを追加") { router.requestAddBlock() }
+                .keyboardShortcut("n")
+        }
+        CommandMenu("移動") {
+            Button("今") { router.tab = .now }.keyboardShortcut("1")
+            Button("スケジュール") { router.tab = .schedule }.keyboardShortcut("2")
+            Button("統計") { router.tab = .stats }.keyboardShortcut("3")
+            Button("ボード") { router.tab = .board }.keyboardShortcut("4")
+        }
+    }
 }
 
 /// Top-level tabs: the floating Liquid Glass tab bar at the top on iPadOS 26.

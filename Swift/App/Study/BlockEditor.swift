@@ -20,7 +20,6 @@ struct BlockEditor: View {
     @State private var initial: Draft?
     @State private var confirmDiscard = false
     @State private var confirmDelete = false
-    @FocusState private var nameFocused: Bool
 
     private struct Draft: Equatable {
         var name: String, type: BlockType, start: Int, end: Int, cascade: Bool
@@ -47,7 +46,6 @@ struct BlockEditor: View {
                 }
                 Section {
                     TextField("名前", text: $name, prompt: Text(BlockStyle.of(type).label))
-                        .focused($nameFocused)
                         .submitLabel(.done)
                 } header: {
                     Text("名前")

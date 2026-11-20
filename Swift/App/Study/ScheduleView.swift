@@ -8,6 +8,7 @@ import SwiftUI
 struct ScheduleView: View {
     @Environment(StudyController.self) private var study
     @Environment(ScheduleUndo.self) private var undo
+    @Environment(AppRouter.self) private var router
     @Environment(\.undoManager) private var undoManager
     @State private var editing: EditTarget?
     @State private var showPomodoro = false
@@ -101,7 +102,6 @@ struct ScheduleView: View {
                 EditButton()
                     .disabled(blocks.isEmpty)
                 Button("ブロックを追加", systemImage: "plus") { editing = .new }
-                    .keyboardShortcut("n", modifiers: .command)
             }
         }
         .sheet(item: $editing) { target in
@@ -111,6 +111,11 @@ struct ScheduleView: View {
             }
         }
         .sheet(isPresented: $showPomodoro) { PomodoroSheet() }
+        .onChange(of: router.addBlockPending, initial: true) {
+            guard router.addBlockPending else { return }
+            router.addBlockPending = false
+            if editing == nil && !showPomodoro { editing = .new }
+        }
         .toast($toast)
     }
 
