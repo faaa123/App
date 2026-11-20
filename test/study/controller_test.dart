@@ -130,6 +130,37 @@ void main() {
     reopened.dispose();
   });
 
+  test('a clock that went back resumes rollover and drops future days', () async {
+    final c = make();
+    await c.init();
+    await c.addBlock(blk(c, 'a', BlockType.study, o(9, 0), o(10, 0)));
+    clock = DateTime(2026, 11, 30, 8); // clock briefly ahead
+    await c.refresh();
+    expect(c.minutesByDate()['2026-11-25'], 60);
+
+    clock = DateTime(2026, 11, 20, 12); // corrected
+    await c.refresh(force: true);
+    expect(
+      c.minutesByDate().keys.where((k) => k.compareTo('2026-11-20') > 0),
+      isEmpty,
+    );
+
+    await c.setBlocks([blk(c, 'sat', BlockType.study, o(13, 0), o(14, 0))]);
+    await c.saveAsPreset('weekend');
+    await c.setPresetWeekdays(c.presets.single.id, {6}); // Saturday
+    await c.setBlocks([blk(c, 'fri', BlockType.study, o(9, 0), o(10, 0))]);
+
+    clock = DateTime(2026, 11, 21, 8); // Saturday
+    await c.refresh();
+    expect(c.blocks.map((b) => b.name), ['sat']);
+    expect(c.minutesByDate()['2026-11-20'], 60);
+    expect(
+      c.minutesByDate().keys.where((k) => k.compareTo('2026-11-21') > 0),
+      isEmpty,
+    );
+    c.dispose();
+  });
+
   test('malformed stored data does not block init', () async {
     store = MemoryStudyStore({
       'blocks': [

@@ -237,6 +237,7 @@ class StudyController extends ChangeNotifier {
         ? null
         : LogicalDay.parseDateKey(_data.lastRecorded!);
     var advanced = false;
+    var changed = false;
     if (last == null) {
       // First run: no history to invent.
       _data.lastRecorded = LogicalDay.dateKey(yesterday);
@@ -262,6 +263,14 @@ class StudyController extends ChangeNotifier {
       if (!identical(sched, _data.blocks)) _data.blocks = _freshIds(sched);
       _data.lastRecorded = LogicalDay.dateKey(yesterday);
       advanced = true;
+    } else if (last.isAfter(yesterday)) {
+      // The clock went back (it was ahead, or a time-zone move): forget
+      // summaries of days that have not finished yet, so rollover resumes
+      // tomorrow. No preset apply: today may already have been edited.
+      final todayKey = LogicalDay.dateKey(day);
+      _data.summaries.removeWhere((k, _) => k.compareTo(todayKey) >= 0);
+      _data.lastRecorded = LogicalDay.dateKey(yesterday);
+      changed = true;
     }
     if (advanced) {
       // Today's weekday preset, only when the day begins (D-12): same-day
@@ -276,7 +285,7 @@ class StudyController extends ChangeNotifier {
     );
     final before = _data.summaries.length;
     _data.summaries.removeWhere((k, _) => k.compareTo(cutoff) < 0);
-    return advanced || _data.summaries.length != before;
+    return advanced || changed || _data.summaries.length != before;
   }
 
   /// The in-memory data is already updated: show it first, then persist.
