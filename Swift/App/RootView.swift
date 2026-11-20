@@ -1,7 +1,7 @@
 import StudyCore
 import SwiftUI
 
-enum AppTab: Hashable {
+enum AppTab: String, Hashable {
     case now, schedule, stats, board
 }
 
@@ -44,6 +44,8 @@ struct AppCommands: Commands {
 /// Tab bar only, never a sidebar (the user finds a sidebar in the way).
 struct RootView: View {
     @Environment(AppRouter.self) private var router
+    /// Reopens the tab the user left (HIG: restore state on relaunch).
+    @SceneStorage("tab") private var savedTab = AppTab.now.rawValue
 
     var body: some View {
         @Bindable var router = router
@@ -62,5 +64,9 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.tabBarOnly)
+        .onAppear {
+            if let t = AppTab(rawValue: savedTab) { router.tab = t }
+        }
+        .onChange(of: router.tab) { _, t in savedTab = t.rawValue }
     }
 }

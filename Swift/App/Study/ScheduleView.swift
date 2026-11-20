@@ -39,8 +39,11 @@ struct ScheduleView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                 } else {
+                    let nowOffset = LogicalDay.offset(of: study.now().local)
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { i, b in
-                        BlockRow(block: b)
+                        BlockRow(block: b,
+                                 gapBefore: i > 0 ? b.start - blocks[i - 1].end : 0,
+                                 isCurrent: b.contains(nowOffset))
                             .contentShape(.rect)
                             .onTapGesture { editing = .block(b) }
                             .accessibilityAddTraits(.isButton)
@@ -170,31 +173,50 @@ private struct ScheduleSummary: View {
 
 private struct BlockRow: View {
     let block: Block
+    /// Free minutes since the previous block (0 = back to back).
+    var gapBefore = 0
+    var isCurrent = false
 
     var body: some View {
         let style = BlockStyle.of(block.type)
-        HStack(spacing: 16) {
-            Image(systemName: style.icon)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(style.onColor)
-                .frame(width: 40, height: 40)
-                .background(style.color, in: .circle)
-                .accessibilityHidden(true)
-            // Times lead (they are what a timetable is scanned for); the name
-            // shows only when it says more than the icon's type.
-            VStack(alignment: .leading, spacing: 2) {
-                Text(rangeLabel(block))
-                    .font(.title3.monospacedDigit())
-                Text(block.name == style.label
-                     ? Format.minutes(block.duration)
-                     : "\(block.name)・\(Format.minutes(block.duration))")
+        VStack(alignment: .leading, spacing: 6) {
+            if gapBefore > 0 {
+                // Free time between blocks, so the timetable reads like a day.
+                Label("フリー \(Format.minutes(gapBefore))", systemImage: "hourglass")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.leading, 56)
             }
-            Spacer(minLength: 0)
+            HStack(spacing: 16) {
+                Image(systemName: style.icon)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(style.onColor)
+                    .frame(width: 40, height: 40)
+                    .background(style.color, in: .circle)
+                // Times lead (they are what a timetable is scanned for); the
+                // name shows only when it says more than the icon's type.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(rangeLabel(block))
+                        .font(.title3.monospacedDigit())
+                    Text(block.name == style.label
+                         ? Format.minutes(block.duration)
+                         : "\(block.name)・\(Format.minutes(block.duration))")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if isCurrent {
+                    Text("いま")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .foregroundStyle(style.onColor)
+                        .background(style.color, in: .capsule)
+                }
+            }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(style.label)、\(block.name)")
-        .accessibilityValue("\(LogicalDay.clock(block.start))から\(LogicalDay.clock(block.end))まで、\(Format.minutes(block.duration))")
+        .accessibilityLabel("\(isCurrent ? "実行中、" : "")\(style.label)、\(block.name)")
+        .accessibilityValue("\(LogicalDay.clock(block.start))から\(LogicalDay.clock(block.end))まで、\(Format.minutes(block.duration))\(gapBefore > 0 ? "、前にフリー\(Format.minutes(gapBefore))" : "")")
     }
 }
