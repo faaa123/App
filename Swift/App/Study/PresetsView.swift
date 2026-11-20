@@ -35,8 +35,11 @@ struct PresetsView: View {
                                onLoad: { load(p) },
                                onDelete: { delete(p) })
                 }
+                .listRowBackground(Theme.surface)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.page)
         .readableWidth()
         .navigationTitle("プリセット")
         .toolbar {

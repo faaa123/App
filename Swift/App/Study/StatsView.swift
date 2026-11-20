@@ -6,30 +6,79 @@ import SwiftUI
 struct StatsView: View {
     @Environment(StudyController.self) private var study
 
+    @State private var width: CGFloat = 0
+
     var body: some View {
         let byDate = study.minutesByDate()
         let today = study.today
-        let threshold = study.threshold
+        let threshold = Binding(get: { study.threshold }, set: { study.setThreshold($0) })
+        let week = Self.lastDays(7, today: today, byDate: byDate)
+        let month = Self.lastDays(30, today: today, byDate: byDate)
+        // Side by side charts on a landscape (or large) iPad.
+        let wide = width >= 960
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                StreakCard(streak: study.streak(), threshold: Binding(
-                    get: { threshold },
-                    set: { study.setThreshold($0) }
-                ))
-                PeriodCard(title: "直近7日", days: Self.lastDays(7, today: today, byDate: byDate),
-                           threshold: threshold, showsValues: true)
-                PeriodCard(title: "直近30日", days: Self.lastDays(30, today: today, byDate: byDate),
-                           threshold: threshold, showsValues: false)
+            VStack(alignment: .leading, spacing: 20) {
+                // The three tiles in a row, stacked when they don't fit.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 20) {
+                        tiles(week: week, threshold: threshold)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 16) {
+                        tiles(week: week, threshold: threshold)
+                    }
+                }
+                if wide {
+                    HStack(alignment: .top, spacing: 20) {
+                        PeriodCard(title: "直近7日", days: week, threshold: threshold.wrappedValue, showsValues: true)
+                        PeriodCard(title: "直近30日", days: month, threshold: threshold.wrappedValue, showsValues: false)
+                    }
+                } else {
+                    PeriodCard(title: "直近7日", days: week, threshold: threshold.wrappedValue, showsValues: true)
+                    PeriodCard(title: "直近30日", days: month, threshold: threshold.wrappedValue, showsValues: false)
+                }
                 Text("スケジュールに入っている勉強時間（予定）を集計しています。今日の分は、今のスケジュールから計算した見込みです。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
             }
-            .padding(20)
+            .padding(.horizontal, wide ? 40 : 20)
+            .padding(.vertical, 20)
         }
-        .readableWidth(900)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .readableWidth(1280)
+        .background(Theme.page)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .navigationTitle("統計")
+    }
+
+    @ViewBuilder
+    private func tiles(week: [DayMinutes], threshold: Binding<Int>) -> some View {
+        let total = week.reduce(0) { $0 + $1.minutes }
+        StreakTile(streak: study.streak())
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                MinuteStepper(label: "達成の基準", value: threshold, range: 10...720, step: 10)
+                    .font(.headline)
+                Text("1日の勉強時間がこれ以上の日を「達成」として数えます。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        Card {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("直近7日の合計")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(Format.minutes(total))
+                    .font(.title.weight(.semibold).monospacedDigit())
+                Text("平均 \(Format.minutes(total / max(week.count, 1)))")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     /// The last n logical days, oldest first, ending today.
@@ -48,50 +97,40 @@ struct DayMinutes: Identifiable {
     var id: String { date.key }
 }
 
-private struct StreakCard: View {
+/// The streak on the screen's one ink (hero) card.
+private struct StreakTile: View {
     let streak: Int
-    @Binding var threshold: Int
     /// Grows with Dynamic Type like the large-title style.
     @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 56
-    @ScaledMetric(relativeTo: .largeTitle) private var flameSize: CGFloat = 36
 
     var body: some View {
-        Card {
-            // Wraps the stepper below the streak in narrow windows.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 24) { count; Spacer(minLength: 0); stepper.frame(maxWidth: 340) }
-                VStack(alignment: .leading, spacing: 16) { count; stepper }
+        Card(fill: Theme.hero) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: streak > 0 ? "flame.fill" : "flame")
+                        .foregroundStyle(streak > 0 ? BlockStyle.rest.color : Theme.heroSecondary)
+                    Text("連続達成")
+                        .foregroundStyle(Theme.heroSecondary)
+                }
+                .font(.subheadline.weight(.semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(streak)")
+                        .font(.system(size: numberSize, weight: .semibold).monospacedDigit())
+                    Text("日").font(.title2.weight(.semibold))
+                }
+                .foregroundStyle(Theme.heroText)
             }
-        }
-    }
-
-    private var count: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: streak > 0 ? "flame.fill" : "flame")
-                .font(.system(size: flameSize))
-                .foregroundStyle(streak > 0 ? AnyShapeStyle(Color.orange) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
-            Text("\(streak)")
-                .font(.system(size: numberSize, weight: .semibold, design: .rounded).monospacedDigit())
-            Text("日連続").font(.title2)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("連続達成")
         .accessibilityValue("\(streak)日")
     }
-
-    private var stepper: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            MinuteStepper(label: "達成の基準", value: $threshold, range: 10...720, step: 10)
-            Text("1日の勉強時間がこれ以上の日を「達成」として数えます。")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 /// Bars per day with the goal as a dashed rule. Met days are solid with a
-/// check mark; missed days are pale, so the difference is in shape as well as
-/// color. Swift Charts adds VoiceOver's audio graph; each bar reads as
+/// check mark; missed days are grey, so the difference is in shape as well as
+/// color. Today (an estimate) is a paler blue. Swift Charts adds VoiceOver's audio graph; each bar reads as
 /// "11月20日、1時間30分、達成".
 private struct PeriodCard: View {
     let title: String
@@ -137,7 +176,7 @@ private struct PeriodCard: View {
                     y: .value("勉強時間", d.minutes),
                     width: .ratio(0.7)
                 )
-                .foregroundStyle(ok ? mark : mark.opacity(0.35))
+                .foregroundStyle(d.isToday ? mark.opacity(0.45) : ok ? mark : Theme.free)
                 .cornerRadius(4)
                 .annotation(position: .top, spacing: 4) {
                     if showsValues && d.minutes > 0 {
