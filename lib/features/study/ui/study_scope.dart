@@ -17,9 +17,19 @@ class StudyScope extends InheritedNotifier<StudyController> {
 
 /// Study = deep, calm; rest = bright. Shape (icon) differs too, not only color.
 class BlockStyle {
-  const BlockStyle._(this.color, this.onColor, this.icon, this.label);
+  const BlockStyle._(
+    this.color,
+    this.onColor,
+    this.mark,
+    this.icon,
+    this.label,
+  );
 
+  /// Large fills with [onColor] text on them.
   final Color color;
+
+  /// Lines and bars drawn on the dark surface (≥ 3:1 contrast).
+  final Color mark;
   final Color onColor;
   final IconData icon;
   final String label;
@@ -27,12 +37,14 @@ class BlockStyle {
   static const study = BlockStyle._(
     Color(0xFF2E3A8C),
     Color(0xFFE8EAFF),
+    Color(0xFF8C9EFF),
     Icons.menu_book,
     '勉強',
   );
   static const rest = BlockStyle._(
     Color(0xFFFFC857),
     Color(0xFF3A2A00),
+    Color(0xFFFFC857),
     Icons.local_cafe_outlined,
     '休憩',
   );

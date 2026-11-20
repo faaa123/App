@@ -72,7 +72,7 @@ class _BandPainter extends CustomPainter {
     final span = (to - from).toDouble();
     double x(int o) => (o - from) / span * size.width;
     for (final b in blocks) {
-      final color = BlockStyle.of(b.type).color;
+      final color = BlockStyle.of(b.type).mark;
       // Shape tells study and rest apart too: rest is drawn half height.
       final rest = b.type == BlockType.rest;
       final top = rest ? size.height * 0.25 : 0.0;

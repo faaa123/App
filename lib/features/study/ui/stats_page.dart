@@ -125,10 +125,15 @@ class _PeriodCard extends StatelessWidget {
                             const SizedBox(height: 4),
                             Container(
                               height: max(2, 120 * minutes / peak),
+                              // Missed days: same hue, outlined, so they
+                              // differ by shape as well as by color.
                               decoration: BoxDecoration(
                                 color: minutes >= threshold
-                                    ? BlockStyle.study.color
-                                    : BlockStyle.study.color.withValues(alpha: 0.4),
+                                    ? BlockStyle.study.mark
+                                    : BlockStyle.study.mark.withValues(alpha: 0.3),
+                                border: minutes >= threshold
+                                    ? null
+                                    : Border.all(color: BlockStyle.study.mark),
                                 borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(4),
                                 ),
