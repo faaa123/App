@@ -119,15 +119,28 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
   // MARK: - Native buttons (avoid Flutter overlays above the canvas)
 
   private func addButtons() {
-    let stack = UIStackView(arrangedSubviews: [
-      makeButton("pencil.tip.crop.circle", label: "ツール") { [weak self] in
-        self?.toggleToolPicker()
-      },
-      makeButton("arrow.uturn.backward", label: "元に戻す") { [weak self] in
-        self?.canvas.undoManager?.undo()
-      },
-      makeButton("trash", label: "全消去") { [weak self] in self?.clear() },
-    ])
+    // Top-left: app menu (the Flutter side shows/hides its navigation).
+    addToolbar(
+      [
+        makeButton("sidebar.left", label: "メニュー") { [weak self] in
+          self?.channel.invokeMethod("menu", arguments: nil)
+        }
+      ], leading: true)
+    // Top-right: drawing controls.
+    addToolbar(
+      [
+        makeButton("pencil.tip.crop.circle", label: "ツール") { [weak self] in
+          self?.toggleToolPicker()
+        },
+        makeButton("arrow.uturn.backward", label: "元に戻す") { [weak self] in
+          self?.canvas.undoManager?.undo()
+        },
+        makeButton("trash", label: "全消去") { [weak self] in self?.clear() },
+      ], leading: false)
+  }
+
+  private func addToolbar(_ buttons: [UIButton], leading: Bool) {
+    let stack = UIStackView(arrangedSubviews: buttons)
     stack.axis = .horizontal
     stack.spacing = 4
     stack.layoutMargins = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
@@ -136,10 +149,12 @@ final class PencilCanvasPlatformView: NSObject, FlutterPlatformView {
     stack.layer.cornerRadius = 12
     stack.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(stack)
+    let guide = container.safeAreaLayoutGuide
     NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 12),
-      stack.trailingAnchor.constraint(
-        equalTo: container.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+      stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 12),
+      leading
+        ? stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 12)
+        : stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -12),
     ])
   }
 

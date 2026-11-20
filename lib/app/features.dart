@@ -26,6 +26,7 @@ const appFeatures = <AppFeature>[
     label: 'ボード',
     icon: Icons.draw_outlined,
     builder: _whiteboard,
+    immersive: true,
   ),
 ];
 

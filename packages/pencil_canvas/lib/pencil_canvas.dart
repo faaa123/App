@@ -4,8 +4,12 @@ import 'package:flutter/widgets.dart';
 
 /// Controls a [PencilCanvas] once its native view has been created.
 class PencilCanvasController {
-  PencilCanvasController._(int viewId)
-      : _channel = MethodChannel('pencil_canvas/$viewId');
+  PencilCanvasController._(int viewId, VoidCallback? onMenu)
+      : _channel = MethodChannel('pencil_canvas/$viewId') {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'menu') onMenu?.call();
+    });
+  }
 
   final MethodChannel _channel;
 
@@ -29,9 +33,12 @@ class PencilCanvasController {
 ///
 /// On other platforms a placeholder is shown.
 class PencilCanvas extends StatelessWidget {
-  const PencilCanvas({super.key, this.onCreated});
+  const PencilCanvas({super.key, this.onCreated, this.onMenu});
 
   final ValueChanged<PencilCanvasController>? onCreated;
+
+  /// Called when the native menu button (top-left) is tapped.
+  final VoidCallback? onMenu;
 
   static const _viewType = 'pencil_canvas/view';
 
@@ -42,8 +49,11 @@ class PencilCanvas extends StatelessWidget {
     }
     return UiKitView(
       viewType: _viewType,
-      onPlatformViewCreated: (id) =>
-          onCreated?.call(PencilCanvasController._(id)),
+      onPlatformViewCreated: (id) {
+        // Always create it: it also listens for the native menu button.
+        final controller = PencilCanvasController._(id, onMenu);
+        onCreated?.call(controller);
+      },
     );
   }
 }
