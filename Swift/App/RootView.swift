@@ -13,8 +13,7 @@ struct RootView: View {
         TabView(selection: $tab) {
             Tab("今", systemImage: "timer", value: AppTab.now) {
                 NavigationStack {
-                    Text("今")
-                        .navigationTitle("今")
+                    NowView()
                 }
             }
             Tab("スケジュール", systemImage: "list.bullet", value: AppTab.schedule) {
