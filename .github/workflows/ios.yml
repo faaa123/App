@@ -1,9 +1,8 @@
 name: iOS build
 
+# Paused during the Swift rewrite (see .github/workflows/swift.yml); it can
+# still be run by hand. Removed once the Swift app is confirmed on device.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 # The jobs only read the code; the IPA is uploaded as a workflow artifact.

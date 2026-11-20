@@ -1,0 +1,84 @@
+# XcodeGen spec. CI runs `xcodegen generate` here; the .xcodeproj is not
+# committed.
+name: App
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: ja
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: "2"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  StudyCore:
+    path: Packages/StudyCore
+
+targets:
+  StudyApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+    dependencies:
+      - package: StudyCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: App
+        CFBundleName: App
+        CFBundleDevelopmentRegion: ja
+        CFBundleLocalizations: [ja]
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        # Same id as the Flutter app, so installing over it keeps study.json.
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.app
+        PRODUCT_NAME: StudyApp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_PREVIEWS: YES
+
+  StudyAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: StudyApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  StudyApp:
+    build:
+      targets:
+        StudyApp: all
+        StudyAppTests: [test]
+    test:
+      targets:
+        - StudyAppTests

@@ -1,0 +1,78 @@
+name: Swift build
+
+on:
+  push:
+    branches: [main, swift]
+  pull_request:
+  workflow_dispatch:
+
+# The jobs only read the code; the IPA is uploaded as a workflow artifact.
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: StudyCore (swift test, Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - run: swift test --package-path Swift/Packages/StudyCore
+
+  build-ios:
+    name: App (test + unsigned IPA)
+    needs: core-tests
+    runs-on: macos-26
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: Swift
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Select Xcode 26.6 (iOS 26 SDK)
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          xcodebuild -version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK $sdk"
+          case "$sdk" in 26*) ;; *) echo "iOS 26 SDK required"; exit 1;; esac
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Test on an iPad simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json | jq -r '
+            [.devices | to_entries[]
+             | select(.key | test("iOS-26"))
+             | .value[] | select(.name | startswith("iPad"))][0].udid')
+          echo "simulator: $udid"
+          test -n "$udid" && test "$udid" != null
+          xcodebuild test -project App.xcodeproj -scheme StudyApp \
+            -destination "id=$udid" -derivedDataPath build/test \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Build (unsigned)
+        run: |
+          xcodebuild build -project App.xcodeproj -scheme StudyApp \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build/release \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/release/Build/Products/Release-iphoneos/StudyApp.app Payload/
+          zip -qr app-unsigned.ipa Payload
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-unsigned-ipa
+          path: Swift/app-unsigned.ipa
+          retention-days: 14
