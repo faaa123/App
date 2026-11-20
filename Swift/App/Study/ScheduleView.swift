@@ -167,6 +167,12 @@ private struct ScheduleSummary: View {
                     .font(.footnote)
                     .foregroundStyle(.tint)
             }
+            if !study.blocks.isEmpty {
+                Label("チャイムは7日先まで予約されます。1週間以上アプリを開かないと鳴らなくなります。",
+                      systemImage: "bell")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             ChimePermissionNotice()
         }
         .padding(.vertical, 4)
