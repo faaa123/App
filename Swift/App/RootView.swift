@@ -27,7 +27,7 @@ struct RootView: View {
                 }
             }
             Tab("ボード", systemImage: "pencil.tip", value: AppTab.board) {
-                Text("ボード")
+                BoardView()
             }
         }
     }
