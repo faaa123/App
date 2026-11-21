@@ -74,10 +74,12 @@ private struct BoardCanvas: UIViewControllerRepresentable {
 ///
 /// Apple Pencil gestures are left entirely to PKToolPicker: squeeze shows its
 /// curved palette (tools, color, undo/redo) at the pencil tip, and double-tap
-/// follows Settings > Apple Pencil, also while the picker is hidden. The app
-/// installs no UIPencilInteraction of its own: one in the view hierarchy
-/// took the gestures away from PKToolPicker, leaving only the system's
-/// undo/redo palette on squeeze and cancelling out the eraser switch.
+/// follows Settings > Apple Pencil. PKToolPicker handles them only while it
+/// is visible (hidden, a squeeze gets just the system undo/redo palette and
+/// double-tap does nothing), so the picker is shown whenever the board is;
+/// the user can minimize it from the palette itself, as in Notes. The app
+/// installs no UIPencilInteraction of its own, which would take the gestures
+/// away from PKToolPicker.
 final class BoardViewController: UIViewController {
     /// Board size relative to the visible area.
     private static let boardScale: CGFloat = 3
@@ -116,8 +118,9 @@ final class BoardViewController: UIViewController {
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.selectedTool = initialTool
         toolPicker.addObserver(canvas)
-        // Associated with the canvas, hidden until squeezed or the tools button.
-        toolPicker.setVisible(false, forFirstResponder: canvas)
+        // Shown with the canvas (see the type comment); the tools button
+        // hides and shows it.
+        toolPicker.setVisible(true, forFirstResponder: canvas)
     }
 
     override func viewDidLayoutSubviews() {
@@ -151,6 +154,8 @@ final class BoardViewController: UIViewController {
     private func activateCanvas() {
         guard view.window != nil, !canvas.isFirstResponder else { return }
         canvas.becomeFirstResponder()
+        // Hidden when the board was left (viewWillDisappear); bring it back.
+        toolPicker.setVisible(true, forFirstResponder: canvas)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
