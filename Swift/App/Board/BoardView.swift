@@ -111,12 +111,6 @@ final class BoardViewController: UIViewController {
         canvas.showsVerticalScrollIndicator = false
         canvas.showsHorizontalScrollIndicator = false
         canvas.contentInsetAdjustmentBehavior = .never
-        // Fingers pan and zoom; the pencil only draws. Keeping the pencil out
-        // of the scroll view's recognizers means a pencil touch never waits
-        // on them to fail before the stroke begins.
-        let fingers = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
-        canvas.panGestureRecognizer.allowedTouchTypes = fingers
-        canvas.pinchGestureRecognizer?.allowedTouchTypes = fingers
         canvas.frame = view.bounds
         canvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(canvas)

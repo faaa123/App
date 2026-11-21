@@ -4,22 +4,12 @@ import SwiftUI
 /// The app's main screen: what to do now and how long is left.
 struct NowView: View {
     @Environment(StudyController.self) private var study
-    @Environment(AppRouter.self) private var router
 
     var body: some View {
-        Group {
-            if router.tab == .now {
-                // Ticks just after each wall-clock second, so the countdown
-                // changes in step with the clock (and the chimes).
-                TimelineView(.periodic(from: Self.alignedStart, by: 1)) { _ in
-                    NowContent(now: study.now())
-                }
-            } else {
-                // TabView keeps this screen alive behind the others; a
-                // per-second main-thread update there would cost frames while
-                // the pencil draws on the board, so it stops ticking.
-                NowContent(now: study.now())
-            }
+        // Ticks just after each wall-clock second, so the countdown changes in
+        // step with the clock (and the chimes). Only this screen ticks.
+        TimelineView(.periodic(from: Self.alignedStart, by: 1)) { _ in
+            NowContent(now: study.now())
         }
         .navigationTitle(Format.date(study.today))
         .navigationBarTitleDisplayMode(.inline)
