@@ -2,10 +2,11 @@ import StudyCore
 import SwiftUI
 
 /// Block colors follow the Cupertino design system (design/cupertino) with
-/// no hue at all: study is the label color (ink: black in light mode, white
-/// in dark), rest a light system gray. The accent (blue) stays for buttons,
-/// selection and links. Shape (bar vs dot, band height, icon) and lightness
-/// differ, so the two never depend on color.
+/// no hue at all, and little difference: a study block is an ordinary card
+/// (grouped secondary background) with ink marks, a rest block a light
+/// system gray card with gray marks. The accent (blue) stays for buttons,
+/// selection and links. Shape (bar vs dot, band height), icon and label tell
+/// the two apart, never color alone.
 struct BlockStyle {
     /// Large fills (the Now card, the running row).
     let color: Color
@@ -16,10 +17,14 @@ struct BlockStyle {
     let icon: String
     let label: String
 
-    static let study = BlockStyle(color: Color(.label), onColor: Color(.systemBackground),
+    static let study = BlockStyle(color: Color(.secondarySystemGroupedBackground), onColor: .primary,
                                   mark: Color(.label), icon: "book.fill", label: "勉強")
     static let rest = BlockStyle(color: Color(.systemGray5), onColor: .primary,
-                                 mark: Color(.systemGray2), icon: "cup.and.saucer.fill", label: "休憩")
+                                 mark: Color(.systemGray3), icon: "cup.and.saucer.fill", label: "休憩")
+
+    /// Background of the running block's row in lists (either type), so it
+    /// stands out from the white rows around it.
+    static let currentRow = Color(.systemGray5)
 
     static func of(_ t: BlockType) -> BlockStyle { t == .study ? study : rest }
 }

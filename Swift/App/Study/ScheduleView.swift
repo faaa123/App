@@ -131,10 +131,10 @@ struct ScheduleView: View {
 
     /// One block in the list: a real button (works with VoiceOver, Full
     /// Keyboard Access and pointer hover, not only touch), filled with its
-    /// block color while it is running.
+    /// light gray while it is running.
     private func blockRow(_ b: Block, at i: Int, gapBefore: Int, nowOffset: Int) -> some View {
         let current = b.contains(nowOffset)
-        let background: Color? = current ? BlockStyle.of(b.type).color : nil
+        let background: Color? = current ? BlockStyle.currentRow : nil
         return Button { editing = .block(b) } label: {
             BlockRow(block: b, gapBefore: gapBefore, isCurrent: current, isPast: b.end <= nowOffset)
         }
@@ -325,8 +325,7 @@ private struct BlockRow: View {
                 .foregroundStyle(.secondary)
             }
             HStack(spacing: 16) {
-                BlockMark(type: block.type, color: isCurrent ? style.onColor : nil,
-                          height: block.isStudy ? 32 : 20)
+                BlockMark(type: block.type, height: block.isStudy ? 32 : 20)
                     .opacity(isPast ? 0.5 : 1)
                 // Times lead (they are what a timetable is scanned for); the
                 // name shows only when it says more than the type.
@@ -345,12 +344,11 @@ private struct BlockRow: View {
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .foregroundStyle(style.color)
-                        .background(style.onColor, in: .capsule)
+                        .foregroundStyle(Color(.systemBackground))
+                        .background(Color(.label), in: .capsule)
                 }
             }
         }
-        .foregroundStyle(isCurrent ? AnyShapeStyle(style.onColor) : AnyShapeStyle(HierarchicalShapeStyle.primary))
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(isCurrent ? "実行中、" : "")\(style.label)、\(block.name)")
