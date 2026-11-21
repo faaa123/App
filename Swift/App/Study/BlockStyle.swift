@@ -2,10 +2,10 @@ import StudyCore
 import SwiftUI
 
 /// Block colors follow the Cupertino design system (design/cupertino):
-/// system colors used by meaning, so dark mode and Increase Contrast come
-/// from the OS. Study = indigo (the HIG's category color for focus), rest =
-/// teal. Shape (bar vs dot, band height, icon) differs too, so color is never
-/// the only cue. The accent (blue) stays for buttons, selection and links.
+/// system colors only, so dark mode and Increase Contrast come from the OS.
+/// Study = the app's accent (system blue: studying is what the app is for),
+/// rest = system orange; the app uses orange for nothing else. Shape (bar vs
+/// dot, band height, icon) differs too, so color is never the only cue.
 struct BlockStyle {
     /// Fills, and marks drawn on the page or a card.
     let color: Color
@@ -17,8 +17,8 @@ struct BlockStyle {
     /// Lines, bars and icons on the page (the same system color).
     var mark: Color { color }
 
-    static let study = BlockStyle(color: .indigo, onColor: .white, icon: "book.fill", label: "勉強")
-    static let rest = BlockStyle(color: .teal, onColor: .black, icon: "cup.and.saucer.fill", label: "休憩")
+    static let study = BlockStyle(color: .accentColor, onColor: .white, icon: "book.fill", label: "勉強")
+    static let rest = BlockStyle(color: .orange, onColor: .black, icon: "cup.and.saucer.fill", label: "休憩")
 
     static func of(_ t: BlockType) -> BlockStyle { t == .study ? study : rest }
 }
