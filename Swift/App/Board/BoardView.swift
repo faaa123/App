@@ -69,23 +69,22 @@ private struct BoardCanvas: UIViewControllerRepresentable {
     }
 }
 
+
 /// Hosts the PKCanvasView.
 ///
-/// Squeeze (Apple Pencil Pro): PKToolPicker presents itself at the hovering
-/// pencil tip once it has been shown (the board shows it briefly on open).
-/// If it still does not appear, the squeeze handler shows it where it last
-/// was (`pencilInteraction(_:didReceiveSqueeze:)`).
-final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
-                                  @preconcurrency PKToolPickerObserver {
+/// Apple Pencil gestures are left entirely to PKToolPicker: squeeze shows its
+/// curved palette (tools, color, undo/redo) at the pencil tip, and double-tap
+/// follows Settings > Apple Pencil, also while the picker is hidden. The app
+/// installs no UIPencilInteraction of its own: one in the view hierarchy
+/// took the gestures away from PKToolPicker, leaving only the system's
+/// undo/redo palette on squeeze and cancelling out the eraser switch.
+final class BoardViewController: UIViewController {
     /// Board size relative to the visible area.
     private static let boardScale: CGFloat = 3
 
     private let canvas = PKCanvasView()
     private let toolPicker = BoardViewController.makeToolPicker()
     private let initialTool = PKInkingTool(.pen, color: .black, width: 3)
-    /// Tool picker items, for "switch to previous tool" and eraser toggling.
-    private var currentItemID: String?
-    private var previousItemID: String?
     private var boardReady = false
 
     /// The standard tool set, with the eraser starting as the pixel eraser
@@ -117,14 +116,8 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.selectedTool = initialTool
         toolPicker.addObserver(canvas)
-        toolPicker.addObserver(self)
-        currentItemID = toolPicker.selectedToolItemIdentifier
         // Associated with the canvas, hidden until squeezed or the tools button.
         toolPicker.setVisible(false, forFirstResponder: canvas)
-
-        let pencil = UIPencilInteraction()
-        pencil.delegate = self
-        view.addInteraction(pencil)
     }
 
     override func viewDidLayoutSubviews() {
@@ -152,27 +145,13 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
         }
     }
 
-    /// The tool picker only works while the canvas is first responder, so
-    /// take that as soon as the board shows, before any stroke.
-    ///
-    /// PKToolPicker presents itself at the pencil tip on a squeeze only after
-    /// it has been shown once (before that the system's undo/redo palette
-    /// appears), so show it briefly the first time, then hide it.
+    /// The tool picker (and its squeeze palette) works only while the canvas
+    /// is first responder, so take that as soon as the board shows, before
+    /// any stroke.
     private func activateCanvas() {
-        guard view.window != nil else { return }
-        if !canvas.isFirstResponder {
-            canvas.becomeFirstResponder()
-        }
-        guard canvas.isFirstResponder, !pickerPrimed else { return }
-        pickerPrimed = true
-        toolPicker.setVisible(true, forFirstResponder: canvas)
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(600))
-            guard let self else { return }
-            self.toolPicker.setVisible(false, forFirstResponder: self.canvas)
-        }
+        guard view.window != nil, !canvas.isFirstResponder else { return }
+        canvas.becomeFirstResponder()
     }
-    private var pickerPrimed = false
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
@@ -210,82 +189,5 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
     func toggleToolPicker() {
         canvas.becomeFirstResponder()
         toolPicker.setVisible(!toolPicker.isVisible, forFirstResponder: canvas)
-    }
-
-    // MARK: - Apple Pencil squeeze
-
-    func pencilInteraction(_ interaction: UIPencilInteraction,
-                           didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
-        // PKToolPicker normally presents itself at the pencil tip. Only if it
-        // did not (the picker is still hidden a moment later), show it where
-        // it last was, rather than leave the system's undo/redo palette.
-        guard squeeze.phase == .ended,
-              UIPencilInteraction.preferredSqueezeAction != .ignore,
-              !toolPicker.isVisible else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
-            guard let self, !self.toolPicker.isVisible else { return }
-            self.activateCanvas()
-            self.toolPicker.setVisible(true, forFirstResponder: self.canvas)
-        }
-    }
-
-    // MARK: - Apple Pencil double-tap
-
-    func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
-        // PKToolPicker may handle the same double-tap itself (it does while
-        // it is attached to the first responder). Let it go first, and act
-        // only if the selection did not change, so the two never cancel out.
-        let before = toolPicker.selectedToolItemIdentifier
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self, self.toolPicker.selectedToolItemIdentifier == before else { return }
-            self.handleDoubleTap()
-        }
-    }
-
-    /// Follows Settings > Apple Pencil > double-tap, switching between the
-    /// tool picker's own items, so the eraser is the palette's eraser with
-    /// its settings (pixel or object, width).
-    private func handleDoubleTap() {
-        switch UIPencilInteraction.preferredTapAction {
-        case .ignore:
-            return
-        case .switchEraser:
-            if toolPicker.selectedToolItem is PKToolPickerEraserItem {
-                selectItem(previousItemID ?? firstInkingItemID)
-            } else {
-                selectItem(toolPicker.toolItems.first { $0 is PKToolPickerEraserItem }?.identifier)
-            }
-        case .switchPrevious:
-            selectItem(previousItemID ?? firstInkingItemID)
-        default: // color palette, ink attributes, contextual palette, …
-            toggleToolPicker()
-        }
-    }
-
-    private var firstInkingItemID: String? {
-        toolPicker.toolItems.first { $0 is PKToolPickerInkingItem }?.identifier
-    }
-
-    /// Selects a tool picker item; the picker tells the canvas (an observer).
-    private func selectItem(_ id: String?) {
-        guard let id, id != toolPicker.selectedToolItemIdentifier else { return }
-        toolPicker.selectedToolItemIdentifier = id
-        noteSelection()
-    }
-
-    /// Remembers the item before the current one, for switching back.
-    private func noteSelection() {
-        let id = toolPicker.selectedToolItemIdentifier
-        guard id != currentItemID else { return }
-        previousItemID = currentItemID
-        currentItemID = id
-    }
-
-    // MARK: - PKToolPickerObserver (choices made in the palette)
-
-    func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
-        noteSelection()
     }
 }
