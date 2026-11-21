@@ -14,9 +14,10 @@ concurrency:
   group: swift-${{ github.ref }}
   cancel-in-progress: true
 
-# The three jobs run side by side: the IPA is ready in about two minutes
-# instead of waiting for the simulator tests. A red test job still marks the
-# run as failed, so check it before trusting an IPA.
+# The two jobs run side by side; the IPA is ready in about two minutes.
+# The iPad simulator tests (AppTests) no longer run in CI: they only checked
+# that screens render, which every build is checked for on the iPad anyway.
+# Run them in Xcode when needed.
 jobs:
   core-tests:
     name: StudyCore (swift test, Linux)
@@ -68,36 +69,3 @@ jobs:
           path: Swift/app-unsigned.ipa
           retention-days: 14
 
-  ios-tests:
-    name: App (iPad simulator tests)
-    runs-on: macos-26
-    timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: Swift
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-      - name: Select Xcode 26.6 (iOS 26 SDK)
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
-          echo "iOS SDK $sdk"
-          case "$sdk" in 26*) ;; *) echo "iOS 26 SDK required"; exit 1;; esac
-      - name: Generate Xcode project
-        run: |
-          brew install xcodegen
-          xcodegen generate
-      - name: Test on an iPad simulator
-        run: |
-          udid=$(xcrun simctl list devices available --json | jq -r '
-            [.devices | to_entries[]
-             | select(.key | test("iOS-26"))
-             | .value[] | select(.name | startswith("iPad"))][0].udid')
-          echo "simulator: $udid"
-          test -n "$udid" && test "$udid" != null
-          xcodebuild test -project App.xcodeproj -scheme StudyApp \
-            -destination "id=$udid" -derivedDataPath build/test \
-            CODE_SIGNING_ALLOWED=NO
