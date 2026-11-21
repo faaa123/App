@@ -42,6 +42,12 @@ struct BoardView: View {
             // Black ink on white in either appearance.
             .environment(\.colorScheme, .light)
             .toolbarVisibility(showTabBar ? .visible : .hidden, for: .tabBar)
+            // A stroke that starts near a screen edge would otherwise wait for
+            // the system to rule out its own edge gestures before ink appears.
+            // Deferred, the first swipe goes to the board and only a second
+            // one opens Control Center or the Home screen.
+            .defersSystemGestures(on: .all)
+            .persistentSystemOverlays(.hidden)
             .onAppear { showTabBar = false }
     }
 }
@@ -111,6 +117,12 @@ final class BoardViewController: UIViewController {
         canvas.showsVerticalScrollIndicator = false
         canvas.showsHorizontalScrollIndicator = false
         canvas.contentInsetAdjustmentBehavior = .never
+        // Fingers pan and zoom; the pencil only draws. Keeping the pencil out
+        // of the scroll view's recognizers means a pencil touch never waits
+        // on them to fail before the stroke begins.
+        let fingers = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+        canvas.panGestureRecognizer.allowedTouchTypes = fingers
+        canvas.pinchGestureRecognizer?.allowedTouchTypes = fingers
         canvas.frame = view.bounds
         canvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(canvas)
