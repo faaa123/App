@@ -1,24 +1,25 @@
 import StudyCore
 import SwiftUI
 
-/// Block colors follow the Cupertino design system (design/cupertino):
-/// system colors only, so dark mode and Increase Contrast come from the OS.
-/// Study = the app's accent (system blue: studying is what the app is for),
-/// rest = system orange; the app uses orange for nothing else. Shape (bar vs
-/// dot, band height, icon) differs too, so color is never the only cue.
+/// Block colors follow the Cupertino design system (design/cupertino) with
+/// no hue at all: study is the label color (ink: black in light mode, white
+/// in dark), rest a light system gray. The accent (blue) stays for buttons,
+/// selection and links. Shape (bar vs dot, band height, icon) and lightness
+/// differ, so the two never depend on color.
 struct BlockStyle {
-    /// Fills, and marks drawn on the page or a card.
+    /// Large fills (the Now card, the running row).
     let color: Color
     /// Content on a `color` fill.
     let onColor: Color
+    /// Lines, bars and dots drawn on the page or a card.
+    let mark: Color
     let icon: String
     let label: String
 
-    /// Lines, bars and icons on the page (the same system color).
-    var mark: Color { color }
-
-    static let study = BlockStyle(color: .accentColor, onColor: .white, icon: "book.fill", label: "勉強")
-    static let rest = BlockStyle(color: .orange, onColor: .black, icon: "cup.and.saucer.fill", label: "休憩")
+    static let study = BlockStyle(color: Color(.label), onColor: Color(.systemBackground),
+                                  mark: Color(.label), icon: "book.fill", label: "勉強")
+    static let rest = BlockStyle(color: Color(.systemGray5), onColor: .primary,
+                                 mark: Color(.systemGray2), icon: "cup.and.saucer.fill", label: "休憩")
 
     static func of(_ t: BlockType) -> BlockStyle { t == .study ? study : rest }
 }
@@ -31,7 +32,7 @@ struct BlockMark: View {
     var height: CGFloat = 22
 
     var body: some View {
-        let fill = color ?? BlockStyle.of(type).color
+        let fill = color ?? BlockStyle.of(type).mark
         Group {
             if type == .study {
                 Capsule()
