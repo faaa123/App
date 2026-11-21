@@ -73,21 +73,32 @@ private struct BoardCanvas: UIViewControllerRepresentable {
 ///
 /// Squeeze (Apple Pencil Pro) is left to PKToolPicker: with the "show
 /// contextual palette" setting it shows the palette right at the hovering
-/// pencil tip, but only while the canvas is first responder, so the canvas
-/// takes that as soon as the board appears (`activateCanvas`). The UIPencilInteraction here therefore implements only the tap
-/// callback (a squeeze callback would override that built-in behavior).
-/// PKToolPicker handles double-tap only while it is visible, so we handle it
-/// while it is hidden.
-final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
+/// pencil tip. That needs the canvas to be first responder and the picker to
+/// have been shown once for it, so the board does both as soon as it appears
+/// (`activateCanvas`). The UIPencilInteraction here therefore implements only
+/// the tap callback (a squeeze callback would override the built-in palette).
+final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
+                                  @preconcurrency PKToolPickerObserver {
     /// Board size relative to the visible area.
     private static let boardScale: CGFloat = 3
 
     private let canvas = PKCanvasView()
-    private let toolPicker = PKToolPicker()
+    private let toolPicker = BoardViewController.makeToolPicker()
     private let initialTool = PKInkingTool(.pen, color: .black, width: 3)
-    /// Tool to return to for "switch to previous tool" and eraser toggling.
-    private var previousTool: PKTool?
+    /// Tool picker items, for "switch to previous tool" and eraser toggling.
+    private var currentItemID: String?
+    private var previousItemID: String?
     private var boardReady = false
+    private var pickerPrimed = false
+
+    /// The standard tool set, with the eraser starting as the pixel eraser
+    /// (erases what the tip touches) rather than the object eraser.
+    private static func makeToolPicker() -> PKToolPicker {
+        let items = PKToolPicker().toolItems.map { item -> PKToolPickerItem in
+            item is PKToolPickerEraserItem ? PKToolPickerEraserItem(type: .bitmap) : item
+        }
+        return PKToolPicker(toolItems: items)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -109,6 +120,8 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.selectedTool = initialTool
         toolPicker.addObserver(canvas)
+        toolPicker.addObserver(self)
+        currentItemID = toolPicker.selectedToolItemIdentifier
         // Associated with the canvas, hidden until squeezed or the tools button.
         toolPicker.setVisible(false, forFirstResponder: canvas)
 
@@ -144,11 +157,21 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
 
     /// The tool picker (and with it the squeeze palette) only works while the
     /// canvas is first responder, so take that as soon as the board shows,
-    /// before any stroke.
+    /// before any stroke. Squeeze also showed only undo/redo until the picker
+    /// had been shown once, so show it once and hide it again right away.
     private func activateCanvas() {
-        guard view.window != nil, !canvas.isFirstResponder else { return }
-        canvas.becomeFirstResponder()
-        toolPicker.setVisible(false, forFirstResponder: canvas)
+        guard view.window != nil else { return }
+        if !canvas.isFirstResponder {
+            canvas.becomeFirstResponder()
+        }
+        guard canvas.isFirstResponder, !pickerPrimed else { return }
+        pickerPrimed = true
+        toolPicker.setVisible(true, forFirstResponder: canvas)
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self else { return }
+            self.toolPicker.setVisible(false, forFirstResponder: self.canvas)
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -192,40 +215,59 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate {
     // MARK: - Apple Pencil double-tap
 
     func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
-        handleDoubleTap()
+        // PKToolPicker may handle the same double-tap itself (it does while
+        // it is attached to the first responder). Let it go first, and act
+        // only if the selection did not change, so the two never cancel out.
+        let before = toolPicker.selectedToolItemIdentifier
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, self.toolPicker.selectedToolItemIdentifier == before else { return }
+            self.handleDoubleTap()
+        }
     }
 
-    /// Follows Settings > Apple Pencil > double-tap. Only while the picker is
-    /// hidden; when visible, PKToolPicker does this itself.
+    /// Follows Settings > Apple Pencil > double-tap, switching between the
+    /// tool picker's own items, so the eraser is the palette's eraser with
+    /// its settings (pixel or object, width).
     private func handleDoubleTap() {
-        guard !toolPicker.isVisible else { return }
         switch UIPencilInteraction.preferredTapAction {
         case .ignore:
             return
         case .switchEraser:
-            if canvas.tool is PKEraserTool {
-                select(previousTool ?? initialTool)
+            if toolPicker.selectedToolItem is PKToolPickerEraserItem {
+                selectItem(previousItemID ?? firstInkingItemID)
             } else {
-                select(pickerEraser)
+                selectItem(toolPicker.toolItems.first { $0 is PKToolPickerEraserItem }?.identifier)
             }
         case .switchPrevious:
-            select(previousTool ?? initialTool)
+            selectItem(previousItemID ?? firstInkingItemID)
         default: // color palette, ink attributes, contextual palette, …
             toggleToolPicker()
         }
     }
 
-    /// The tool picker's own eraser, as the user set it up there (pixel or
-    /// object eraser, and its width), so double-tap matches tapping the eraser
-    /// in the palette. Pixel eraser if the picker has none.
-    private var pickerEraser: PKTool {
-        toolPicker.toolItems.compactMap { $0 as? PKToolPickerEraserItem }.first?.eraserTool
-            ?? PKEraserTool(.bitmap)
+    private var firstInkingItemID: String? {
+        toolPicker.toolItems.first { $0 is PKToolPickerInkingItem }?.identifier
     }
 
-    private func select(_ tool: PKTool) {
-        previousTool = canvas.tool
-        canvas.tool = tool
-        toolPicker.selectedTool = tool // keep the picker in sync
+    /// Selects a tool picker item; the picker tells the canvas (an observer).
+    private func selectItem(_ id: String?) {
+        guard let id, id != toolPicker.selectedToolItemIdentifier else { return }
+        toolPicker.selectedToolItemIdentifier = id
+        noteSelection()
+    }
+
+    /// Remembers the item before the current one, for switching back.
+    private func noteSelection() {
+        let id = toolPicker.selectedToolItemIdentifier
+        guard id != currentItemID else { return }
+        previousItemID = currentItemID
+        currentItemID = id
+    }
+
+    // MARK: - PKToolPickerObserver (choices made in the palette)
+
+    func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
+        noteSelection()
     }
 }
