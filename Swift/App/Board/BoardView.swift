@@ -42,12 +42,6 @@ struct BoardView: View {
             // Black ink on white in either appearance.
             .environment(\.colorScheme, .light)
             .toolbarVisibility(showTabBar ? .visible : .hidden, for: .tabBar)
-            // A stroke that starts near a screen edge would otherwise wait for
-            // the system to rule out its own edge gestures before ink appears.
-            // Deferred, the first swipe goes to the board and only a second
-            // one opens Control Center or the Home screen.
-            .defersSystemGestures(on: .all)
-            .persistentSystemOverlays(.hidden)
             .onAppear { showTabBar = false }
     }
 }
