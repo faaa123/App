@@ -71,10 +71,10 @@ private struct BoardCanvas: UIViewControllerRepresentable {
 
 /// Hosts the PKCanvasView.
 ///
-/// Squeeze (Apple Pencil Pro): while the tool picker is visible, PKToolPicker
-/// itself moves it to the hovering pencil tip. While it is hidden, PencilKit
-/// only offers a small undo/redo palette, so a squeeze then brings up the
-/// tool picker (`pencilInteraction(_:didReceiveSqueeze:)`).
+/// Squeeze (Apple Pencil Pro): PKToolPicker presents itself at the hovering
+/// pencil tip once it has been shown (the board shows it briefly on open).
+/// If it still does not appear, the squeeze handler shows it where it last
+/// was (`pencilInteraction(_:didReceiveSqueeze:)`).
 final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
                                   @preconcurrency PKToolPickerObserver {
     /// Board size relative to the visible area.
@@ -154,10 +154,25 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
 
     /// The tool picker only works while the canvas is first responder, so
     /// take that as soon as the board shows, before any stroke.
+    ///
+    /// PKToolPicker presents itself at the pencil tip on a squeeze only after
+    /// it has been shown once (before that the system's undo/redo palette
+    /// appears), so show it briefly the first time, then hide it.
     private func activateCanvas() {
-        guard view.window != nil, !canvas.isFirstResponder else { return }
-        canvas.becomeFirstResponder()
+        guard view.window != nil else { return }
+        if !canvas.isFirstResponder {
+            canvas.becomeFirstResponder()
+        }
+        guard canvas.isFirstResponder, !pickerPrimed else { return }
+        pickerPrimed = true
+        toolPicker.setVisible(true, forFirstResponder: canvas)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard let self else { return }
+            self.toolPicker.setVisible(false, forFirstResponder: self.canvas)
+        }
     }
+    private var pickerPrimed = false
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
@@ -201,14 +216,18 @@ final class BoardViewController: UIViewController, UIPencilInteractionDelegate,
 
     func pencilInteraction(_ interaction: UIPencilInteraction,
                            didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
-        // A hidden picker would leave only PencilKit's undo/redo palette;
-        // show the full tool picker instead. A visible one is PKToolPicker's
-        // to handle (it moves to the pencil tip).
+        // PKToolPicker normally presents itself at the pencil tip. Only if it
+        // did not (the picker is still hidden a moment later), show it where
+        // it last was, rather than leave the system's undo/redo palette.
         guard squeeze.phase == .ended,
               UIPencilInteraction.preferredSqueezeAction != .ignore,
               !toolPicker.isVisible else { return }
-        activateCanvas()
-        toolPicker.setVisible(true, forFirstResponder: canvas)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let self, !self.toolPicker.isVisible else { return }
+            self.activateCanvas()
+            self.toolPicker.setVisible(true, forFirstResponder: self.canvas)
+        }
     }
 
     // MARK: - Apple Pencil double-tap
