@@ -19,6 +19,8 @@ settings:
 packages:
   StudyCore:
     path: Packages/StudyCore
+  GeoCore:
+    path: Packages/GeoCore
 
 targets:
   StudyApp:
@@ -75,6 +77,51 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.app.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  # High-school geography white maps (separate app; iPadOS 27).
+  GeoAtlas:
+    type: application
+    platform: iOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: GeoAtlas/App
+        excludes:
+          - Info.plist
+      - path: GeoAtlas/Resources/Geo
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: GeoCore
+    info:
+      path: GeoAtlas/App/Info.plist
+      properties:
+        CFBundleDisplayName: 白地図
+        CFBundleName: GeoAtlas
+        CFBundleDevelopmentRegion: ja
+        CFBundleLocalizations: [ja]
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.geoatlas
+        PRODUCT_NAME: GeoAtlas
+        MARKETING_VERSION: "1.0.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_PREVIEWS: YES
+
 schemes:
   StudyApp:
     build:
@@ -84,3 +131,7 @@ schemes:
     test:
       targets:
         - StudyAppTests
+  GeoAtlas:
+    build:
+      targets:
+        GeoAtlas: all
