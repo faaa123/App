@@ -77,11 +77,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.app.tests
         GENERATE_INFOPLIST_FILE: YES
 
-  # High-school geography white maps (separate app; iPadOS 27).
+  # High-school geography white maps (separate app). Built with the iOS 26
+  # SDK (no Xcode 27 on the CI runners yet); runs on iPadOS 27.
   GeoAtlas:
     type: application
     platform: iOS
-    deploymentTarget: "27.0"
     sources:
       - path: GeoAtlas/App
         excludes:

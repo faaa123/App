@@ -71,7 +71,7 @@ jobs:
           retention-days: 14
 
   geoatlas-ipa:
-    name: GeoAtlas (unsigned IPA, iPadOS 27)
+    name: GeoAtlas (unsigned IPA)
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -81,16 +81,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - name: Select Xcode 27 (iOS 27 SDK)
+      - name: Select Xcode 26.6 (iOS 26 SDK)
         run: |
-          ls -d /Applications/Xcode*.app
-          xcode=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$xcode" ]; then echo "No Xcode 27 on this runner"; exit 1; fi
-          sudo xcode-select -s "$xcode"
+          sudo xcode-select -s /Applications/Xcode_26.6.app
           xcodebuild -version
-          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
-          echo "iOS SDK $sdk"
-          case "$sdk" in 27*) ;; *) echo "iOS 27 SDK required"; exit 1;; esac
       - name: Generate Xcode project
         run: |
           brew install xcodegen
