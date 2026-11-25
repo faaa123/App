@@ -1,9 +1,9 @@
-"""Builds the GeoJSON files bundled with the app (地図 tab).
+"""Builds the theme data for the white maps (build_pdf.py): rivers, plate
+boundaries and Koppen climates as GeoJSON in data/.
 
-Run once, offline; the outputs in ../Resources/Geo are committed and the app
-never downloads anything.
+Run once, offline; the outputs are committed.
 
-    python -I -X utf8 build_geodata.py <raw-dir> <out-dir>
+    python -I -X utf8 build_geodata.py <raw-dir> data
 
 <raw-dir> must hold these downloads:
 
@@ -15,13 +15,8 @@ never downloads anything.
   koeppen-geiger.vu-wien.ac.at: Koeppen-Geiger-ASCII.zip, extracted to
   kg/Koeppen-Geiger-ASCII.txt
 
-Also bundled, not built here: glyphs/geo/0-255.pbf, the Latin glyphs for
-map labels (Open Sans Semibold, Apache 2.0, from
-demotiles.maplibre.org/font/Open%20Sans%20Semibold/0-255.pbf). Japanese
-text is drawn with the system font on the device.
-
-Outputs (.geojson): rivers, plates, koppen. The base map (ocean,
-coastline, borders, lakes) is world.pmtiles, built by build_tiles.sh.
+data/schematics.json (ocean currents, winds and pressure belts, orogenic
+belts, ranges, plate names) is hand-made, not built here.
 """
 
 import json

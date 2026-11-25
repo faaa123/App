@@ -7,8 +7,6 @@ struct StudyApp: SwiftUI.App {
     @State private var undo: ScheduleUndo
     @State private var router = AppRouter()
     @State private var chimes: NotificationChimeScheduler
-    /// The 地図 tab: what the map shows.
-    @State private var mapSettings = MapSettings()
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -28,7 +26,6 @@ struct StudyApp: SwiftUI.App {
                 .environment(router)
                 .environment(chimes)
                 .environment(undo)
-                .environment(mapSettings)
                 .task { await runDayTimer() }
         }
         .commands { AppCommands(router: router) }

@@ -19,12 +19,6 @@ settings:
 packages:
   StudyCore:
     path: Packages/StudyCore
-  GeoCore:
-    path: Packages/GeoCore
-  # The 地図 tab's map engine (vector tiles, Metal). BSD 2-Clause.
-  MapLibre:
-    url: https://github.com/maplibre/maplibre-gl-native-distribution
-    exactVersion: 7.0.0
 
 targets:
   StudyApp:
@@ -34,14 +28,8 @@ targets:
       - path: App
         excludes:
           - Info.plist
-      # Map data for the 地図 tab, kept as a folder so it lands in Geo/.
-      - path: Resources/Geo
-        type: folder
-        buildPhase: resources
     dependencies:
       - package: StudyCore
-      - package: GeoCore
-      - package: MapLibre
     info:
       path: App/Info.plist
       properties:
@@ -59,9 +47,6 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSupportsIndirectInputEvents: true
-        # Map labels in Japanese are drawn with this system font (with
-        # Japanese glyph forms), not downloaded glyphs.
-        MLNIdeographicFontFamilyName: Hiragino Sans
         UIRequiresFullScreen: false
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait

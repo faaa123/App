@@ -20,7 +20,7 @@ concurrency:
 # Run them in Xcode when needed.
 jobs:
   core-tests:
-    name: StudyCore + GeoCore (swift test, Linux)
+    name: StudyCore (swift test, Linux)
     runs-on: ubuntu-latest
     container: swift:6.2-noble
     timeout-minutes: 15
@@ -29,7 +29,6 @@ jobs:
         with:
           persist-credentials: false
       - run: swift test --package-path Swift/Packages/StudyCore
-      - run: swift test --package-path Swift/Packages/GeoCore
 
   ipa:
     name: App (unsigned IPA)

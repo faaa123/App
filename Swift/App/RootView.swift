@@ -2,7 +2,7 @@ import StudyCore
 import SwiftUI
 
 enum AppTab: String, Hashable {
-    case now, schedule, stats, board, map
+    case now, schedule, stats, board
 }
 
 /// Which tab is selected, so screens can send the user elsewhere (e.g. the
@@ -36,7 +36,6 @@ struct AppCommands: Commands {
             Button("スケジュール") { router.tab = .schedule }.keyboardShortcut("2")
             Button("統計") { router.tab = .stats }.keyboardShortcut("3")
             Button("ボード") { router.tab = .board }.keyboardShortcut("4")
-            Button("地図") { router.tab = .map }.keyboardShortcut("5")
         }
     }
 }
@@ -62,9 +61,6 @@ struct RootView: View {
             }
             Tab("ボード", systemImage: "pencil.and.scribble", value: AppTab.board) {
                 BoardView()
-            }
-            Tab("地図", systemImage: "map", value: AppTab.map) {
-                AtlasView()
             }
         }
         .tabViewStyle(.tabBarOnly)
