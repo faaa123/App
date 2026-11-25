@@ -184,10 +184,15 @@ enum AtlasStyle {
             var paint: [String: Any] = ["line-color": css(MapStyle.plate(k)),
                                         "line-width": k == .convergent ? 3 : 2]
             // Dashes are in line widths.
-            if k == .transform { paint["line-dasharray"] = [2, 1.5] }
+            // Dashes keep square ends, so they stay apart.
+            var layout = round
+            if k == .transform {
+                paint["line-dasharray"] = [2, 1.5]
+                layout["line-cap"] = "butt"
+            }
             l.append(["id": "plates.all.shape.\(k.rawValue)", "type": "line", "source": "plates",
                       "filter": ["==", ["get", "kind"], k.rawValue],
-                      "layout": k == .transform ? ["line-join": "round"] : round, "paint": paint])
+                      "layout": layout, "paint": paint])
         }
 
         let warm: [Any] = ["case", ["get", "warm"],
