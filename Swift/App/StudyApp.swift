@@ -7,9 +7,8 @@ struct StudyApp: SwiftUI.App {
     @State private var undo: ScheduleUndo
     @State private var router = AppRouter()
     @State private var chimes: NotificationChimeScheduler
-    /// The 地図 tab: what the map shows, and the projected map data.
+    /// The 地図 tab: what the map shows.
     @State private var mapSettings = MapSettings()
-    @State private var atlas = AtlasModel()
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -30,7 +29,6 @@ struct StudyApp: SwiftUI.App {
                 .environment(chimes)
                 .environment(undo)
                 .environment(mapSettings)
-                .environment(atlas)
                 .task { await runDayTimer() }
         }
         .commands { AppCommands(router: router) }

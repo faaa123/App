@@ -7,7 +7,6 @@ struct AtlasView: View {
     /// Reopens the theme the user left.
     @SceneStorage("mapTheme") private var theme: Theme = .plates
     @Environment(MapSettings.self) private var settings
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showCredits = false
 
     var body: some View {
@@ -19,6 +18,7 @@ struct AtlasView: View {
                 GeometryReader { geo in
                     MapView(primary: theme, insets: geo.safeAreaInsets)
                         .ignoresSafeArea()
+                        .environment(\.colorScheme, .light)
                 }
                 .ignoresSafeArea()
                 if settings.showLegend {
@@ -56,13 +56,9 @@ struct AtlasView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     overlayMenu
                     displayMenu
-                    Button("全体を表示", systemImage: "arrow.down.right.and.arrow.up.left") {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.35)) {
-                            settings.scale = 1
-                            settings.offset = .zero
-                        }
+                    Button("全体を表示", systemImage: "globe.asia.australia") {
+                        settings.resetRequests += 1
                     }
-                    .disabled(settings.scale == 1 && settings.offset == .zero)
                 }
             }
         }
@@ -87,16 +83,6 @@ struct AtlasView: View {
     private var displayMenu: some View {
         @Bindable var settings = settings
         return Menu("表示", systemImage: "globe") {
-            Picker("図法", systemImage: "map", selection: $settings.projection) {
-                ForEach(Projection.allCases) { Text($0.name).tag($0) }
-            }
-            .pickerStyle(.menu)
-            Picker("中心の経線", systemImage: "arrow.left.and.right", selection: $settings.centralMeridian) {
-                Text("0°（大西洋が中央）").tag(0.0)
-                Text("150°E（太平洋が中央）").tag(150.0)
-            }
-            .pickerStyle(.menu)
-            Divider()
             Toggle("地名・名称", systemImage: "character.textbox", isOn: $settings.showLabels)
             Toggle("凡例", systemImage: "list.bullet.rectangle", isOn: $settings.showLegend)
             Divider()
@@ -113,7 +99,9 @@ struct CreditsView: View {
         NavigationStack {
             Form {
                 Section("地図") {
-                    LabeledContent("海岸線・国境・湖・河川", value: "Natural Earth（1:110m。拡大すると1:50m・1:10mに切り替え。河川は1:50mを簡略化）")
+                    LabeledContent("海岸線・国境・湖・河川", value: "Natural Earth（1:10m、河川は1:50mを簡略化）")
+                    LabeledContent("地図の描画", value: "MapLibre Native（BSD 2-Clause）。メルカトル図法")
+                    LabeledContent("ラベルの欧文字形", value: "Open Sans（Apache License 2.0）")
                 }
                 Section("プレート境界") {
                     LabeledContent("PB2002", value: "Bird, P. (2003) An updated digital model of plate boundaries. ODC-BY")

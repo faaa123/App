@@ -147,26 +147,6 @@ public struct MapProjector: Sendable, Hashable {
         return out
     }
 
-    /// Every visible copy of each polygon (outer ring first, then holes),
-    /// in map units. A polygon's rings stay together, copy by copy, so
-    /// even-odd filling still leaves its holes open.
-    public func polygons(_ polygons: [[[GeoPoint]]], maxStep: Double = 2) -> [[[Vec2]]] {
-        var out: [[[Vec2]]] = []
-        for rings in polygons {
-            guard let outer = rings.first, outer.count > 2 else { continue }
-            let dense = rings.map { $0.densified(maxStep: maxStep) }
-            var lo = Double.infinity, hi = -Double.infinity
-            for p in dense[0] {
-                lo = Swift.min(lo, p.lon)
-                hi = Swift.max(hi, p.lon)
-            }
-            for k in copies(minLon: lo, maxLon: hi) {
-                out.append(dense.map { ring in ring.map { project($0, copy: k) } })
-            }
-        }
-        return out
-    }
-
     /// Every visible copy of a point (for labels).
     public func points(_ p: GeoPoint) -> [Vec2] {
         copies(minLon: p.lon, maxLon: p.lon).map { project(p, copy: $0) }

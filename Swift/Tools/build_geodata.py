@@ -7,35 +7,31 @@ never downloads anything.
 
 <raw-dir> must hold these downloads:
 
-- Natural Earth 1:110m (public domain), from
-  github.com/nvkelso/natural-earth-vector/tree/master/geojson:
-  ne_110m_coastline, ne_110m_admin_0_boundary_lines_land, ne_110m_land,
-  ne_110m_lakes (.geojson)
+- Natural Earth 1:10m (public domain), for the base map, from
+  github.com/nvkelso/natural-earth-vector/tree/master/geojson: ne_10m_ocean,
+  ne_10m_coastline, ne_10m_admin_0_boundary_lines_land, ne_10m_lakes
+  (.geojson)
 - Natural Earth 1:50m rivers (public domain): ne_50m_rivers_lake_centerlines
-  (110m has too few rivers for a textbook map; the curated ones are
-  simplified to 110m-like detail)
+  (the curated ones are simplified)
 - PB2002 plate boundaries (Bird 2003, ODC-BY), steps file from
   github.com/fraxen/tectonicplates: GeoJSON/PB2002_steps.json
 - Koppen-Geiger 1951-2000, 0.5 deg grid (Kottek et al. 2006), from
   koeppen-geiger.vu-wien.ac.at: Koeppen-Geiger-ASCII.zip, extracted to
   kg/Koeppen-Geiger-ASCII.txt
 
-- Natural Earth 1:50m and 1:10m, for the detail shown when zooming in:
-  ne_50m_coastline, ne_50m_admin_0_boundary_lines_land, ne_50m_land,
-  ne_50m_lakes, ne_10m_coastline, ne_10m_admin_0_boundary_lines_land,
-  ne_10m_lakes (.geojson)
+Also bundled, not built here: glyphs/geo/0-255.pbf, the Latin glyphs for
+map labels (Open Sans Semibold, Apache 2.0, from
+demotiles.maplibre.org/font/Open%20Sans%20Semibold/0-255.pbf). Japanese
+text is drawn with the system font on the device.
 
-Outputs: coastline, borders, land, lakes, rivers, plates, koppen (.geojson),
-and the zoomed-in detail as .geobin (see GeoBinary.swift): coastline,
-borders, lakes at 50m and 10m, and land at 50m.
+Outputs (.geojson): ocean, coastline, borders, lakes (1:10m, simplified;
+the map cuts them into per-zoom vector tiles itself), rivers, plates, koppen.
 """
 
 import json
 import os
 import sys
 from collections import Counter, defaultdict, deque
-
-import struct
 
 import numpy as np
 
@@ -97,15 +93,21 @@ def lines_of(geom):
     return []
 
 
-# --- Base map -------------------------------------------------------------
+# --- Base map (1:10m) ------------------------------------------------------
+
+# 0.005° (about 500 m) is below what the map shows at its deepest zoom.
+EPS = 0.005
+
 
 def base_lines(src, out):
     feats = []
     for f in load(src)["features"]:
         for line in lines_of(f["geometry"]):
-            feats.append({"type": "Feature", "properties": {},
-                          "geometry": {"type": "LineString",
-                                       "coordinates": [rnd(p) for p in line]}})
+            simp = dp(line, EPS)
+            if len(simp) >= 2:
+                feats.append({"type": "Feature", "properties": {},
+                              "geometry": {"type": "LineString",
+                                           "coordinates": [rnd(p, 3) for p in simp]}})
     save(out, feats)
 
 
@@ -115,53 +117,14 @@ def base_polygons(src, out):
         g = f["geometry"]
         polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
         for poly in polys:
+            outer = dp(poly[0], EPS)
+            if len(outer) < 4:
+                continue
+            rings = [outer] + [r for r in (dp(h, EPS) for h in poly[1:]) if len(r) >= 4]
             feats.append({"type": "Feature", "properties": {},
                           "geometry": {"type": "Polygon",
-                                       "coordinates": [[rnd(p) for p in r] for r in poly]}})
+                                       "coordinates": [[rnd(p, 3) for p in r] for r in rings]}})
     save(out, feats)
-
-
-# --- Detail for zooming in -------------------------------------------------
-
-def save_bin(name, features):
-    """features: list of parts (lists of [lon, lat]). Format: b"GEOB",
-    u32 feature count; per feature u32 part count; per part u32 point count
-    and float32 lon, lat pairs. Little endian."""
-    path = os.path.join(OUT, name + ".geobin")
-    points = 0
-    with open(path, "wb") as f:
-        f.write(b"GEOB")
-        f.write(struct.pack("<I", len(features)))
-        for parts in features:
-            f.write(struct.pack("<I", len(parts)))
-            for part in parts:
-                f.write(struct.pack("<I", len(part)))
-                f.write(struct.pack(f"<{2 * len(part)}f", *[c for p in part for c in p]))
-                points += len(part)
-    print(f"{name}: {len(features)} features, {points} points, {os.path.getsize(path) // 1024} KB")
-
-
-def detail_lines(src, out, eps):
-    feats = []
-    for f in load(src)["features"]:
-        for line in lines_of(f["geometry"]):
-            simp = dp(line, eps)
-            if len(simp) >= 2:
-                feats.append([simp])
-    save_bin(out, feats)
-
-
-def detail_polygons(src, out, eps):
-    """One feature per polygon (outer ring and its holes kept together)."""
-    feats = []
-    for f in load(src)["features"]:
-        g = f["geometry"]
-        polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
-        for poly in polys:
-            rings = [r for r in (dp(r, eps) for r in poly) if len(r) >= 4]
-            if rings and len(rings[0]) == len(dp(poly[0], eps)):
-                feats.append(rings)
-    save_bin(out, feats)
 
 
 # --- Rivers ---------------------------------------------------------------
@@ -469,17 +432,10 @@ def koppen():
 
 
 os.makedirs(OUT, exist_ok=True)
-base_lines("ne_110m_coastline.geojson", "coastline")
-base_lines("ne_110m_admin_0_boundary_lines_land.geojson", "borders")
-base_polygons("ne_110m_land.geojson", "land")
-base_polygons("ne_110m_lakes.geojson", "lakes")
-detail_lines("ne_50m_coastline.geojson", "coastline_50m", 0.02)
-detail_lines("ne_50m_admin_0_boundary_lines_land.geojson", "borders_50m", 0.02)
-detail_polygons("ne_50m_land.geojson", "land_50m", 0.02)
-detail_polygons("ne_50m_lakes.geojson", "lakes_50m", 0.02)
-detail_lines("ne_10m_coastline.geojson", "coastline_10m", 0.004)
-detail_lines("ne_10m_admin_0_boundary_lines_land.geojson", "borders_10m", 0.004)
-detail_polygons("ne_10m_lakes.geojson", "lakes_10m", 0.004)
+base_polygons("ne_10m_ocean.geojson", "ocean")
+base_lines("ne_10m_coastline.geojson", "coastline")
+base_lines("ne_10m_admin_0_boundary_lines_land.geojson", "borders")
+base_polygons("ne_10m_lakes.geojson", "lakes")
 rivers()
 plates()
 koppen()
