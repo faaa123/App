@@ -5,6 +5,8 @@ import SwiftUI
 /// line widths and text stay the same size at every zoom.
 struct MapPainter {
     var map: ProjectedMap
+    /// Coastline, borders and lakes at the detail level for this zoom.
+    var base: BaseLayers
     var themes: Set<Theme>
     var season: Season
     var showLabels: Bool
@@ -16,6 +18,12 @@ struct MapPainter {
     var wraps = false
 
     private var scale: CGFloat { transform.a }
+
+    /// The screen, in map units: only base-map cells reaching it are drawn.
+    private var visible: CGRect {
+        CGRect(origin: .zero, size: size).insetBy(dx: -4, dy: -4)
+            .applying(transform.inverted()).standardized
+    }
 
     func draw(_ ctx: inout GraphicsContext) {
         ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(MapStyle.surround))
@@ -53,14 +61,19 @@ struct MapPainter {
         if themes.contains(.landforms) { drawOrogeny(&c) }
         if themes.contains(.winds) { drawPressureBelts(&c) }
 
+        if scale * map.unitsPerDegree >= 12 {
+            c.stroke(map.fineGraticule.applying(transform), with: .color(MapStyle.graticule.opacity(0.6)),
+                     lineWidth: 0.4)
+        }
         c.stroke(map.graticule.applying(transform), with: .color(MapStyle.graticule), lineWidth: 0.5)
         c.stroke(map.tropics.applying(transform), with: .color(MapStyle.graticule),
                  style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
         c.stroke(map.equator.applying(transform), with: .color(MapStyle.equator), lineWidth: 0.7)
 
-        c.stroke(map.borders.applying(transform), with: .color(MapStyle.border), lineWidth: 0.5)
-        c.stroke(map.lakes.applying(transform), with: .color(MapStyle.coast), lineWidth: 0.6)
-        c.stroke(map.coastline.applying(transform), with: .color(MapStyle.coast), lineWidth: 0.8)
+        let view = visible
+        c.stroke(base.borders.path(in: view).applying(transform), with: .color(MapStyle.border), lineWidth: 0.5)
+        c.stroke(base.lakes.path(in: view).applying(transform), with: .color(MapStyle.coast), lineWidth: 0.6)
+        c.stroke(base.coastline.path(in: view).applying(transform), with: .color(MapStyle.coast), lineWidth: 0.8)
 
         if themes.contains(.landforms) { drawRangesAndRivers(&c) }
         if themes.contains(.plates) {
@@ -100,12 +113,13 @@ struct MapPainter {
     private func drawKoppen(_ c: inout GraphicsContext) {
         c.drawLayer { layer in
             // The polygons reach a little into the sea; the coastline trims them.
-            layer.clip(to: map.land.applying(transform), style: FillStyle(eoFill: true))
+            layer.clip(to: base.land.applying(transform), style: FillStyle(eoFill: true))
             for (cls, path) in map.koppen {
                 layer.fill(path.applying(transform), with: .color(MapStyle.koppen(cls)), style: FillStyle(eoFill: true))
             }
         }
-        c.fill(map.lakes.applying(transform), with: .color(MapStyle.paper))
+        c.fill(base.lakes.path(in: visible).applying(transform), with: .color(MapStyle.paper),
+               style: FillStyle(eoFill: true))
     }
 
     private func drawOrogeny(_ c: inout GraphicsContext) {
@@ -172,46 +186,72 @@ struct MapPainter {
             // A paper-colored halo keeps names legible over lines and fills.
             layer.addFilter(.shadow(color: MapStyle.labelHalo, radius: 1.5))
             layer.addFilter(.shadow(color: MapStyle.labelHalo, radius: 1.5))
+            // Most important first; a label that would overlap one already
+            // placed is left out (zooming in makes room for it).
+            var placed = LabelSpace()
+            if themes.contains(.winds), let air = map.air[season] {
+                for b in air.belts {
+                    place(&layer, &placed, b.labels, Text(b.belt.name).font(.caption2.weight(.semibold))
+                        .foregroundStyle(MapStyle.pressureText(b.belt.kind)))
+                }
+            }
             if themes.contains(.plates) {
                 for l in map.plateLabels {
-                    place(&layer, l, Text(l.text).font(.caption2).foregroundStyle(Color(.secondaryLabel)))
+                    place(&layer, &placed, l, Text(l.text).font(.caption2).foregroundStyle(Color(.secondaryLabel)))
                 }
             }
             if themes.contains(.landforms) {
-                for l in map.riverLabels {
-                    place(&layer, l, Text(l.text).font(.caption2).foregroundStyle(MapStyle.river), dy: -8)
-                }
                 for (r, _, l) in map.ranges {
-                    place(&layer, l, Text(r.name).font(.caption2.weight(.semibold)).foregroundStyle(MapStyle.range), dy: 10)
+                    place(&layer, &placed, l, Text(r.name).font(.caption2.weight(.semibold))
+                        .foregroundStyle(MapStyle.range), dy: 10)
                 }
             }
             if themes.contains(.currents) {
                 for cur in map.currents {
-                    place(&layer, cur.label, Text(cur.current.name).font(.caption2)
+                    place(&layer, &placed, cur.label, Text(cur.current.name).font(.caption2)
                         .foregroundStyle(MapStyle.current(warm: cur.current.warm)), dy: -9)
                 }
             }
             if themes.contains(.winds), let air = map.air[season] {
-                for b in air.belts {
-                    place(&layer, b.labels, Text(b.belt.name).font(.caption2.weight(.semibold))
-                        .foregroundStyle(MapStyle.pressureText(b.belt.kind)))
-                }
                 for (kind, l) in air.windLabels {
-                    place(&layer, l, Text(kind.name).font(.caption2).foregroundStyle(MapStyle.wind(kind)))
+                    place(&layer, &placed, l, Text(kind.name).font(.caption2).foregroundStyle(MapStyle.wind(kind)))
+                }
+            }
+            if themes.contains(.landforms) {
+                for l in map.riverLabels {
+                    place(&layer, &placed, l, Text(l.text).font(.caption2).foregroundStyle(MapStyle.river), dy: -8)
                 }
             }
         }
     }
 
-    private func place(_ c: inout GraphicsContext, _ label: PlacedLabel, _ text: Text, dy: CGFloat = 0) {
+    /// The screen rectangles labels already cover.
+    private struct LabelSpace {
+        var rects: [CGRect] = []
+
+        mutating func claim(_ r: CGRect) -> Bool {
+            guard !rects.contains(where: { $0.intersects(r) }) else { return false }
+            rects.append(r)
+            return true
+        }
+    }
+
+    private func place(_ c: inout GraphicsContext, _ space: inout LabelSpace, _ label: PlacedLabel,
+                       _ text: Text, dy: CGFloat = 0) {
         let bounds = CGRect(origin: .zero, size: size).insetBy(dx: -60, dy: -20)
         var resolved: GraphicsContext.ResolvedText?
         for p in label.points {
             var v = p.applying(transform)
             guard bounds.contains(v) else { continue }
             v.y += dy
-            if resolved == nil { resolved = c.resolve(text) }
-            if let resolved { c.draw(resolved, at: v, anchor: .center) }
+            let r = resolved ?? c.resolve(text)
+            resolved = r
+            let s = r.measure(in: CGSize(width: 400, height: 200))
+            let box = CGRect(x: v.x - s.width / 2, y: v.y - s.height / 2, width: s.width, height: s.height)
+                .insetBy(dx: -3, dy: -1)
+            if space.claim(box) {
+                c.draw(r, at: v, anchor: .center)
+            }
         }
     }
 }

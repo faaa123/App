@@ -29,13 +29,31 @@ final class MapSettings {
     }
 }
 
-/// Loads the bundled data and keeps one projected map per projection.
+/// One detail level of the base map for one projection.
+struct BaseKey: Hashable, Sendable {
+    var projector: MapProjector
+    var detail: MapDetail
+}
+
+/// Loads the bundled data and keeps one projected map per projection, plus
+/// the base map at each detail level reached so far.
 @MainActor @Observable
 final class AtlasModel {
     private(set) var maps: [MapProjector: ProjectedMap] = [:]
+    private(set) var bases: [BaseKey: BaseLayers] = [:]
     private(set) var failed = false
     @ObservationIgnored private var data: AtlasData?
+    @ObservationIgnored private var details: [MapDetail: BaseData] = [:]
     @ObservationIgnored private var building: Set<MapProjector> = []
+    @ObservationIgnored private var buildingBases: Set<BaseKey> = []
+
+    /// The finest base map ready for `detail` or coarser.
+    func base(_ projector: MapProjector, upTo detail: MapDetail) -> BaseLayers? {
+        for d in MapDetail.allCases.reversed() where d <= detail {
+            if let b = bases[BaseKey(projector: projector, detail: d)] { return b }
+        }
+        return nil
+    }
 
     func prepare(_ projector: MapProjector) async {
         guard maps[projector] == nil, !building.contains(projector) else { return }
@@ -49,13 +67,38 @@ final class AtlasModel {
                 loaded = try await Task.detached(priority: .userInitiated) { try AtlasData.loadBundled() }.value
                 data = loaded
             }
-            let map = await Task.detached(priority: .userInitiated) {
-                ProjectedMap.build(loaded, projector: projector)
+            let (map, base) = await Task.detached(priority: .userInitiated) {
+                (ProjectedMap.build(loaded, projector: projector),
+                 BaseLayers.build(loaded.base, detail: .coarse, projector: projector))
             }.value
+            bases[BaseKey(projector: projector, detail: .coarse)] = base
             maps[projector] = map
         } catch {
             print("Atlas: could not load map data: \(error)")
             failed = true
+        }
+    }
+
+    /// Loads and projects a finer base map (the coarse one comes with
+    /// `prepare`). On failure the map keeps the coarser level.
+    func prepareBase(_ detail: MapDetail, _ projector: MapProjector) async {
+        let key = BaseKey(projector: projector, detail: detail)
+        guard detail > .coarse, bases[key] == nil, !buildingBases.contains(key) else { return }
+        buildingBases.insert(key)
+        defer { buildingBases.remove(key) }
+        do {
+            let raw: BaseData
+            if let cached = details[detail] {
+                raw = cached
+            } else {
+                raw = try await Task.detached(priority: .userInitiated) { try AtlasData.loadDetail(detail) }.value
+                details[detail] = raw
+            }
+            bases[key] = await Task.detached(priority: .userInitiated) {
+                BaseLayers.build(raw, detail: detail, projector: projector)
+            }.value
+        } catch {
+            print("Atlas: could not load \(detail) detail: \(error)")
         }
     }
 }

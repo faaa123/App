@@ -16,7 +16,8 @@ struct MapView: View {
     @Environment(AtlasModel.self) private var atlas
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static let maxScale: CGFloat = 20
+    /// Deep enough for a region to fill the screen (with 1:10m data).
+    static let maxScale: CGFloat = 64
     /// A pinch may go a little past the whole map, then springs back.
     static let minLiveScale: CGFloat = 0.8
 
@@ -29,10 +30,11 @@ struct MapView: View {
             let focus = CGRect(x: insets.leading, y: insets.top,
                                width: max(geo.size.width - insets.leading - insets.trailing, 1),
                                height: max(geo.size.height - insets.top - insets.bottom, 1))
-            if let map = atlas.maps[settings.projector] {
+            if let map = atlas.maps[settings.projector],
+               let base = atlas.base(settings.projector, upTo: detail(focus: focus, map: map)) {
                 let camera = MapCamera(focus: focus, map: map, wraps: wraps)
                 let offset = camera.clamp(settings.offset, scale: settings.scale)
-                MapCanvas(map: map, themes: settings.themes(primary: primary), season: settings.season,
+                MapCanvas(map: map, base: base, themes: settings.themes(primary: primary), season: settings.season,
                           showLabels: settings.showLabels, wraps: wraps, focus: focus, scale: settings.scale,
                           offsetX: offset.width, offsetY: offset.height)
                     .overlay { MapGestureSurface(handlers: handlers(camera)) }
@@ -59,6 +61,26 @@ struct MapView: View {
         .background(MapStyle.surround)
         .environment(\.colorScheme, .light)
         .task(id: settings.projector) { await atlas.prepare(settings.projector) }
+        .task(id: BaseKey(projector: settings.projector, detail: wantedDetail)) {
+            await atlas.prepareBase(wantedDetail, settings.projector)
+        }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { viewSize = $0 }
+    }
+
+    /// The view's size, for picking the detail level outside the reader.
+    @State private var viewSize: CGSize = .zero
+
+    /// The detail level the current zoom calls for.
+    private func detail(focus: CGRect, map: ProjectedMap) -> MapDetail {
+        let ppd = MapCanvas.fit(size: focus.size, map: map) * settings.scale * map.unitsPerDegree
+        return MapDetail.forPointsPerDegree(ppd)
+    }
+
+    private var wantedDetail: MapDetail {
+        guard let map = atlas.maps[settings.projector], viewSize.width > 0 else { return .coarse }
+        let focus = CGSize(width: max(viewSize.width - insets.leading - insets.trailing, 1),
+                           height: max(viewSize.height - insets.top - insets.bottom, 1))
+        return detail(focus: CGRect(origin: .zero, size: focus), map: map)
     }
 
     // MARK: Gestures
@@ -151,6 +173,7 @@ struct MapCamera {
 /// `withAnimation` (double tap, "show whole map") glide.
 struct MapCanvas: View, Animatable {
     var map: ProjectedMap
+    var base: BaseLayers
     var themes: Set<Theme>
     var season: Season
     var showLabels: Bool
@@ -176,11 +199,11 @@ struct MapCanvas: View, Animatable {
     }
 
     var body: some View {
-        Canvas { [map, themes, season, showLabels, wraps, focus, scale, offsetX, offsetY] ctx, size in
+        Canvas { [map, base, themes, season, showLabels, wraps, focus, scale, offsetX, offsetY] ctx, size in
             let s = Self.fit(size: focus.size, map: map) * scale
             let t = CGAffineTransform(a: s, b: 0, c: 0, d: -s,
                                       tx: focus.midX + offsetX, ty: focus.midY + offsetY)
-            MapPainter(map: map, themes: themes, season: season, showLabels: showLabels,
+            MapPainter(map: map, base: base, themes: themes, season: season, showLabels: showLabels,
                        transform: t, size: size, wraps: wraps).draw(&ctx)
         }
     }

@@ -50,13 +50,10 @@ struct ProjectedMap: Sendable {
     var unitsPerDegree: CGFloat
     var outline: Path
     var graticule: Path
+    /// Every 10° between the 30° lines, drawn when zoomed in.
+    var fineGraticule: Path
     var equator: Path
     var tropics: Path
-
-    var coastline: Path
-    var borders: Path
-    var land: Path
-    var lakes: Path
 
     var plates: [(PlateBoundaryKind, Path)]
     var plateLabels: [PlacedLabel]
@@ -104,6 +101,14 @@ struct ProjectedMap: Sendable {
         for lat in [-60.0, -30, 30, 60] {
             gratLines.append([GeoPoint(-180, lat), GeoPoint(180, lat)])
         }
+        var fineLines: [[GeoPoint]] = []
+        for k in -18...18 where k % 3 != 0 {
+            let lon = pj.centralMeridian + 10 * Double(k)
+            fineLines.append([GeoPoint(lon, -80), GeoPoint(lon, 80)])
+        }
+        for k in -8...8 where k % 3 != 0 {
+            fineLines.append([GeoPoint(-180, 10 * Double(k)), GeoPoint(180, 10 * Double(k))])
+        }
         let tropicLat = 23.44, polarLat = 66.56
         let tropics = [tropicLat, -tropicLat, polarLat, -polarLat].map { [GeoPoint(-180, $0), GeoPoint(180, $0)] }
 
@@ -124,12 +129,9 @@ struct ProjectedMap: Sendable {
             unitsPerDegree: perDegree,
             outline: outline,
             graticule: path(gratLines),
+            fineGraticule: path(fineLines),
             equator: path([[GeoPoint(-180, 0), GeoPoint(180, 0)]]),
             tropics: path(tropics),
-            coastline: path(data.coastline),
-            borders: path(data.borders),
-            land: path(data.land, closed: true),
-            lakes: path(data.lakes, closed: true),
             plates: PlateBoundaryKind.allCases.map { ($0, path(data.plates[$0] ?? [])) },
             plateLabels: PlateNames.all.map { label($0.text, $0.at) },
             koppen: KoppenClass.allCases.map { ($0, path(data.koppen[$0] ?? [], closed: true, step: 5)) },

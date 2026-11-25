@@ -20,13 +20,22 @@ never downloads anything.
   koeppen-geiger.vu-wien.ac.at: Koeppen-Geiger-ASCII.zip, extracted to
   kg/Koeppen-Geiger-ASCII.txt
 
-Outputs: coastline, borders, land, lakes, rivers, plates, koppen (.geojson).
+- Natural Earth 1:50m and 1:10m, for the detail shown when zooming in:
+  ne_50m_coastline, ne_50m_admin_0_boundary_lines_land, ne_50m_land,
+  ne_50m_lakes, ne_10m_coastline, ne_10m_admin_0_boundary_lines_land,
+  ne_10m_lakes (.geojson)
+
+Outputs: coastline, borders, land, lakes, rivers, plates, koppen (.geojson),
+and the zoomed-in detail as .geobin (see GeoBinary.swift): coastline,
+borders, lakes at 50m and 10m, and land at 50m.
 """
 
 import json
 import os
 import sys
 from collections import Counter, defaultdict, deque
+
+import struct
 
 import numpy as np
 
@@ -110,6 +119,49 @@ def base_polygons(src, out):
                           "geometry": {"type": "Polygon",
                                        "coordinates": [[rnd(p) for p in r] for r in poly]}})
     save(out, feats)
+
+
+# --- Detail for zooming in -------------------------------------------------
+
+def save_bin(name, features):
+    """features: list of parts (lists of [lon, lat]). Format: b"GEOB",
+    u32 feature count; per feature u32 part count; per part u32 point count
+    and float32 lon, lat pairs. Little endian."""
+    path = os.path.join(OUT, name + ".geobin")
+    points = 0
+    with open(path, "wb") as f:
+        f.write(b"GEOB")
+        f.write(struct.pack("<I", len(features)))
+        for parts in features:
+            f.write(struct.pack("<I", len(parts)))
+            for part in parts:
+                f.write(struct.pack("<I", len(part)))
+                f.write(struct.pack(f"<{2 * len(part)}f", *[c for p in part for c in p]))
+                points += len(part)
+    print(f"{name}: {len(features)} features, {points} points, {os.path.getsize(path) // 1024} KB")
+
+
+def detail_lines(src, out, eps):
+    feats = []
+    for f in load(src)["features"]:
+        for line in lines_of(f["geometry"]):
+            simp = dp(line, eps)
+            if len(simp) >= 2:
+                feats.append([simp])
+    save_bin(out, feats)
+
+
+def detail_polygons(src, out, eps):
+    """One feature per polygon (outer ring and its holes kept together)."""
+    feats = []
+    for f in load(src)["features"]:
+        g = f["geometry"]
+        polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+        for poly in polys:
+            rings = [r for r in (dp(r, eps) for r in poly) if len(r) >= 4]
+            if rings and len(rings[0]) == len(dp(poly[0], eps)):
+                feats.append(rings)
+    save_bin(out, feats)
 
 
 # --- Rivers ---------------------------------------------------------------
@@ -421,6 +473,13 @@ base_lines("ne_110m_coastline.geojson", "coastline")
 base_lines("ne_110m_admin_0_boundary_lines_land.geojson", "borders")
 base_polygons("ne_110m_land.geojson", "land")
 base_polygons("ne_110m_lakes.geojson", "lakes")
+detail_lines("ne_50m_coastline.geojson", "coastline_50m", 0.02)
+detail_lines("ne_50m_admin_0_boundary_lines_land.geojson", "borders_50m", 0.02)
+detail_polygons("ne_50m_land.geojson", "land_50m", 0.02)
+detail_polygons("ne_50m_lakes.geojson", "lakes_50m", 0.02)
+detail_lines("ne_10m_coastline.geojson", "coastline_10m", 0.004)
+detail_lines("ne_10m_admin_0_boundary_lines_land.geojson", "borders_10m", 0.004)
+detail_polygons("ne_10m_lakes.geojson", "lakes_10m", 0.004)
 rivers()
 plates()
 koppen()

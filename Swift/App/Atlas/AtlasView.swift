@@ -113,7 +113,7 @@ struct CreditsView: View {
         NavigationStack {
             Form {
                 Section("地図") {
-                    LabeledContent("海岸線・国境・湖・河川", value: "Natural Earth（1:110m、河川は1:50mを簡略化）")
+                    LabeledContent("海岸線・国境・湖・河川", value: "Natural Earth（1:110m。拡大すると1:50m・1:10mに切り替え。河川は1:50mを簡略化）")
                 }
                 Section("プレート境界") {
                     LabeledContent("PB2002", value: "Bird, P. (2003) An updated digital model of plate boundaries. ODC-BY")

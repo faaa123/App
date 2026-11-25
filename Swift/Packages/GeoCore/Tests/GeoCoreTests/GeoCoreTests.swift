@@ -153,6 +153,44 @@ import Testing
     }
 }
 
+@Suite struct PolygonProjectionTests {
+    @Test func ringsStayTogetherPerCopy() {
+        // A lake with an island, east of the date line seen from 150°E.
+        let lake: [[GeoPoint]] = [
+            [GeoPoint(-170, 0), GeoPoint(-160, 0), GeoPoint(-160, 10), GeoPoint(-170, 10), GeoPoint(-170, 0)],
+            [GeoPoint(-166, 4), GeoPoint(-164, 4), GeoPoint(-164, 6), GeoPoint(-166, 4)],
+        ]
+        let pj = MapProjector(projection: .equirectangular, centralMeridian: 150)
+        let out = pj.polygons([lake])
+        #expect(out.count == 1)
+        #expect(out[0].count == 2)
+        // Drawn east of the central meridian (copy +1), island inside.
+        let xs = out[0][0].map(\.x), island = out[0][1].map(\.x)
+        #expect(xs.allSatisfy { $0 > 0 })
+        #expect(island.allSatisfy { $0 > xs.min()! && $0 < xs.max()! })
+    }
+}
+
+@Suite struct GeoBinaryTests {
+    @Test func roundTrips() throws {
+        let features = [
+            GeoFeature(parts: [[GeoPoint(139.5, 35.25), GeoPoint(-179.75, -89.5)]]),
+            GeoFeature(parts: [[GeoPoint(0, 0), GeoPoint(1, 0), GeoPoint(1, 1), GeoPoint(0, 0)], [GeoPoint(0.5, 0.5)]]),
+        ]
+        let back = try GeoBinary.decode(GeoBinary.encode(features))
+        #expect(back.count == 2)
+        #expect(back[0].parts == features[0].parts)
+        #expect(back[1].parts == features[1].parts)
+    }
+
+    @Test func rejectsBadData() {
+        #expect(throws: GeoBinary.DecodeError.badHeader) { try GeoBinary.decode(Data("JSON".utf8)) }
+        var d = GeoBinary.encode([GeoFeature(parts: [[GeoPoint(1, 2), GeoPoint(3, 4)]])])
+        d.removeLast(3)
+        #expect(throws: GeoBinary.DecodeError.truncated) { try GeoBinary.decode(d) }
+    }
+}
+
 @Suite struct BundledDataTests {
     static let dir = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -166,6 +204,21 @@ import Testing
     @Test func everyFileDecodes() throws {
         for name in ["coastline", "borders", "land", "lakes", "rivers"] {
             #expect(try !load(name).isEmpty, "\(name)")
+        }
+    }
+
+    @Test func detailFilesDecode() throws {
+        for name in ["coastline_50m", "borders_50m", "land_50m", "lakes_50m",
+                     "coastline_10m", "borders_10m", "lakes_10m"] {
+            let url = Self.dir.appendingPathComponent("\(name).geobin")
+            let features = try GeoBinary.decode(Data(contentsOf: url))
+            #expect(!features.isEmpty, "\(name)")
+            for f in features {
+                for part in f.parts {
+                    #expect(part.count >= 2)
+                    #expect(part.allSatisfy { abs($0.lon) <= 180.001 && abs($0.lat) <= 90.001 }, "\(name)")
+                }
+            }
         }
     }
 
