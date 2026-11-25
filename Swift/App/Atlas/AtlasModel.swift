@@ -2,8 +2,8 @@ import GeoCore
 import Observation
 import SwiftUI
 
-/// What the map shows and where it is looking. Shared by all tabs, so
-/// switching tabs keeps the zoom.
+/// What the map shows and where it is looking. Shared by all themes, so
+/// switching themes keeps the zoom.
 @MainActor @Observable
 final class MapSettings {
     var projection: Projection = .robinson
@@ -54,7 +54,7 @@ final class AtlasModel {
             }.value
             maps[projector] = map
         } catch {
-            print("GeoAtlas: could not load map data: \(error)")
+            print("Atlas: could not load map data: \(error)")
             failed = true
         }
     }

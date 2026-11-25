@@ -6,4 +6,3 @@ Payload/
 .build/
 .swiftpm/
 Package.resolved
-GeoAtlas/App/Info.plist

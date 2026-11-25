@@ -11,11 +11,38 @@ struct MapPainter {
     /// Map units → view points.
     var transform: CGAffineTransform
     var size: CGSize
+    /// Repeat the map east and west, so panning never runs out of map
+    /// (only for rectangular projections, whose copies meet seamlessly).
+    var wraps = false
 
     private var scale: CGFloat { transform.a }
 
     func draw(_ ctx: inout GraphicsContext) {
         ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(MapStyle.surround))
+        guard wraps else {
+            drawCopy(&ctx)
+            return
+        }
+        // One copy per world width that reaches the screen.
+        let period = 2 * map.halfExtent.width * scale
+        guard period > 1 else { return }
+        let first = Int(((-period / 2 - transform.tx) / period).rounded(.up))
+        let last = Int(((size.width + period / 2 - transform.tx) / period).rounded(.down))
+        guard first <= last else { return }
+        // Paper under every copy at once, so no hairline shows where they meet.
+        let band = CGRect(x: -map.halfExtent.width, y: -map.halfExtent.height,
+                          width: 2 * map.halfExtent.width, height: 2 * map.halfExtent.height)
+            .applying(transform)
+        ctx.fill(Path(CGRect(x: 0, y: band.minY, width: size.width, height: band.height)),
+                 with: .color(MapStyle.paper))
+        for k in first...last {
+            var copy = self
+            copy.transform.tx += CGFloat(k) * period
+            copy.drawCopy(&ctx)
+        }
+    }
+
+    private func drawCopy(_ ctx: inout GraphicsContext) {
         let outline = map.outline.applying(transform)
         ctx.fill(outline, with: .color(MapStyle.paper))
 
@@ -52,7 +79,18 @@ struct MapPainter {
             }
         }
 
-        ctx.stroke(outline, with: .color(MapStyle.coast), lineWidth: 1)
+        if wraps {
+            // Copies meet at the date line: only the poles' edges are drawn.
+            let top = map.halfExtent.height, w = map.halfExtent.width
+            var edges = Path()
+            edges.move(to: CGPoint(x: -w, y: top))
+            edges.addLine(to: CGPoint(x: w, y: top))
+            edges.move(to: CGPoint(x: -w, y: -top))
+            edges.addLine(to: CGPoint(x: w, y: -top))
+            ctx.stroke(edges.applying(transform), with: .color(MapStyle.coast), lineWidth: 1)
+        } else {
+            ctx.stroke(outline, with: .color(MapStyle.coast), lineWidth: 1)
+        }
 
         if showLabels { drawLabels(&c) }
     }

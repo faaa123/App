@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// Map math and atlas data for GeoAtlas: no UIKit/SwiftUI, so `swift test`
+// Map math and atlas data for the app's 地図 tab: no UIKit/SwiftUI, so `swift test`
 // runs on Linux too.
 let package = Package(
     name: "GeoCore",

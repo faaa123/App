@@ -1,23 +1,11 @@
 import GeoCore
 import SwiftUI
 
-struct RootView: View {
-    @SceneStorage("theme") private var theme: Theme = .plates
-
-    var body: some View {
-        TabView(selection: $theme) {
-            ForEach(Theme.allCases) { t in
-                Tab(t.tabTitle, systemImage: t.symbol, value: t) {
-                    AtlasScreen(theme: t)
-                }
-            }
-        }
-    }
-}
-
-/// One theme's map with its toolbar and legend.
-struct AtlasScreen: View {
-    var theme: Theme
+/// The 地図 tab: a white map that fills the screen, one theme at a time
+/// (picked in the toolbar), with other themes overlaid on request.
+struct AtlasView: View {
+    /// Reopens the theme the user left.
+    @SceneStorage("mapTheme") private var theme: Theme = .plates
     @Environment(MapSettings.self) private var settings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showCredits = false
@@ -25,44 +13,58 @@ struct AtlasScreen: View {
     var body: some View {
         @Bindable var settings = settings
         NavigationStack {
-            MapView(primary: theme)
-                .ignoresSafeArea(edges: .bottom)
-                .overlay(alignment: .bottomLeading) {
-                    if settings.showLegend {
-                        VStack(alignment: .leading, spacing: 8) {
-                            LegendView(theme: theme, season: settings.season)
-                            ForEach(Theme.allCases.filter { $0 != theme && settings.overlays.contains($0) }) { t in
-                                LegendView(theme: t, season: settings.season)
-                            }
+            ZStack(alignment: .bottomLeading) {
+                // Edge to edge, under the glass bars, like a maps app.
+                // The reader spans the bars too, so its insets say where they are.
+                GeometryReader { geo in
+                    MapView(primary: theme, insets: geo.safeAreaInsets)
+                        .ignoresSafeArea()
+                }
+                .ignoresSafeArea()
+                if settings.showLegend {
+                    VStack(alignment: .leading, spacing: 8) {
+                        LegendView(theme: theme, season: settings.season)
+                        ForEach(Theme.allCases.filter { $0 != theme && settings.overlays.contains($0) }) { t in
+                            LegendView(theme: t, season: settings.season)
                         }
-                        .padding()
+                    }
+                    .padding()
+                }
+            }
+            .sheet(isPresented: $showCredits) { CreditsView() }
+            .navigationTitle(theme.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("主題", selection: $theme) {
+                        ForEach(Theme.allCases) { t in
+                            Text(t.tabTitle).tag(t)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+                if settings.themes(primary: theme).contains(.winds) {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Picker("季節", selection: $settings.season) {
+                            ForEach(Season.allCases) { Text($0.name).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .fixedSize()
                     }
                 }
-                .sheet(isPresented: $showCredits) { CreditsView() }
-                .navigationTitle(theme.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if settings.themes(primary: theme).contains(.winds) {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Picker("季節", selection: $settings.season) {
-                                ForEach(Season.allCases) { Text($0.name).tag($0) }
-                            }
-                            .pickerStyle(.segmented)
-                            .fixedSize()
+                ToolbarItemGroup(placement: .primaryAction) {
+                    overlayMenu
+                    displayMenu
+                    Button("全体を表示", systemImage: "arrow.down.right.and.arrow.up.left") {
+                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.35)) {
+                            settings.scale = 1
+                            settings.offset = .zero
                         }
                     }
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        overlayMenu
-                        displayMenu
-                        Button("全体を表示", systemImage: "arrow.down.right.and.arrow.up.left") {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
-                                settings.scale = 1
-                                settings.offset = .zero
-                            }
-                        }
-                        .disabled(settings.scale == 1 && settings.offset == .zero)
-                    }
+                    .disabled(settings.scale == 1 && settings.offset == .zero)
                 }
+            }
         }
     }
 

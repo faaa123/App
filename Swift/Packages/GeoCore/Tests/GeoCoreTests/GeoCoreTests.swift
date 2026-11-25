@@ -157,7 +157,7 @@ import Testing
     static let dir = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("GeoAtlas/Resources/Geo")
+        .appendingPathComponent("Resources/Geo")
 
     func load(_ name: String) throws -> [GeoFeature] {
         try GeoJSON.decode(Data(contentsOf: Self.dir.appendingPathComponent("\(name).geojson")))

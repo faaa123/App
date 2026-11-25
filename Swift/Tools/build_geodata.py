@@ -1,6 +1,6 @@
-"""Builds the GeoJSON files bundled with GeoAtlas.
+"""Builds the GeoJSON files bundled with the app (地図 tab).
 
-Run once, offline; the outputs in ../Resources are committed and the app
+Run once, offline; the outputs in ../Resources/Geo are committed and the app
 never downloads anything.
 
     python -I -X utf8 build_geodata.py <raw-dir> <out-dir>
