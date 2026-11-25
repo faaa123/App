@@ -164,9 +164,15 @@ import Testing
     }
 
     @Test func everyFileDecodes() throws {
-        for name in ["ocean", "coastline", "borders", "lakes", "rivers"] {
+        for name in ["rivers", "plates", "koppen"] {
             #expect(try !load(name).isEmpty, "\(name)")
         }
+    }
+
+    @Test func baseMapIsPMTilesV3() throws {
+        let data = try Data(contentsOf: Self.dir.appendingPathComponent("world.pmtiles"))
+        #expect(data.count > 1_000_000)
+        #expect(Array(data.prefix(8)) == Array("PMTiles".utf8) + [3])
     }
 
     @Test func platesHaveTheThreeKinds() throws {

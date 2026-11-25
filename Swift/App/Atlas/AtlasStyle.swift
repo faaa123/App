@@ -3,9 +3,9 @@ import GeoCore
 import SwiftUI
 import UIKit
 
-/// The map's MapLibre style: the white base map from the bundled 1:10m
-/// GeoJSON (MapLibre cuts it into vector tiles per zoom, as web maps do)
-/// and one set of layers per theme.
+/// The map's MapLibre style: the white base map from bundled vector tiles
+/// (world.pmtiles, Natural Earth 1:10m cut per zoom by tippecanoe, as web
+/// maps do) and one set of layers per theme.
 ///
 /// Layer ids carry what decides their visibility:
 /// `<theme or base>.<season or all>.<label or shape>.<name>`.
@@ -63,10 +63,9 @@ enum AtlasStyle {
         func file(_ name: String) -> String { geo.appending(path: "\(name).geojson").absoluteString }
 
         var sources: [String: Any] = [
-            "ocean": geojson(file("ocean")),
-            "coastline": geojson(file("coastline")),
-            "borders": geojson(file("borders")),
-            "lakes": geojson(file("lakes")),
+            // Layers ocean, coastline, borders, lakes (Tools/build_tiles.sh).
+            "base": ["type": "vector",
+                     "url": "pmtiles://" + geo.appending(path: "world.pmtiles").absoluteString],
             "rivers": geojson(file("rivers")),
             "plates": geojson(file("plates")),
             "koppen": geojson(file("koppen")),
@@ -128,9 +127,9 @@ enum AtlasStyle {
         koppen.append("rgba(0,0,0,0)")
         l.append(["id": "climate.all.shape.koppen", "type": "fill", "source": "koppen",
                   "paint": ["fill-color": koppen]])
-        l.append(["id": "base.all.shape.ocean", "type": "fill", "source": "ocean",
+        l.append(["id": "base.all.shape.ocean", "type": "fill", "source": "base", "source-layer": "ocean",
                   "paint": ["fill-color": paper, "fill-antialias": false]])
-        l.append(["id": "base.all.shape.lakefill", "type": "fill", "source": "lakes",
+        l.append(["id": "base.all.shape.lakefill", "type": "fill", "source": "base", "source-layer": "lakes",
                   "paint": ["fill-color": paper, "fill-antialias": false]])
 
         // Orogenic belts: bands a set number of degrees wide at every zoom.
@@ -167,11 +166,11 @@ enum AtlasStyle {
                   "filter": ["==", ["get", "kind"], "equator"],
                   "paint": ["line-color": css(MapStyle.equator), "line-width": 0.7]])
 
-        l.append(["id": "base.all.shape.borders", "type": "line", "source": "borders",
+        l.append(["id": "base.all.shape.borders", "type": "line", "source": "base", "source-layer": "borders",
                   "paint": ["line-color": css(MapStyle.border), "line-width": 0.5]])
-        l.append(["id": "base.all.shape.lakes", "type": "line", "source": "lakes",
+        l.append(["id": "base.all.shape.lakes", "type": "line", "source": "base", "source-layer": "lakes",
                   "paint": ["line-color": css(MapStyle.coast), "line-width": 0.6]])
-        l.append(["id": "base.all.shape.coastline", "type": "line", "source": "coastline",
+        l.append(["id": "base.all.shape.coastline", "type": "line", "source": "base", "source-layer": "coastline",
                   "paint": ["line-color": css(MapStyle.coast), "line-width": 0.8]])
 
         let round: [String: Any] = ["line-cap": "round", "line-join": "round"]

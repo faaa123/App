@@ -7,10 +7,6 @@ never downloads anything.
 
 <raw-dir> must hold these downloads:
 
-- Natural Earth 1:10m (public domain), for the base map, from
-  github.com/nvkelso/natural-earth-vector/tree/master/geojson: ne_10m_ocean,
-  ne_10m_coastline, ne_10m_admin_0_boundary_lines_land, ne_10m_lakes
-  (.geojson)
 - Natural Earth 1:50m rivers (public domain): ne_50m_rivers_lake_centerlines
   (the curated ones are simplified)
 - PB2002 plate boundaries (Bird 2003, ODC-BY), steps file from
@@ -24,8 +20,8 @@ map labels (Open Sans Semibold, Apache 2.0, from
 demotiles.maplibre.org/font/Open%20Sans%20Semibold/0-255.pbf). Japanese
 text is drawn with the system font on the device.
 
-Outputs (.geojson): ocean, coastline, borders, lakes (1:10m, simplified;
-the map cuts them into per-zoom vector tiles itself), rivers, plates, koppen.
+Outputs (.geojson): rivers, plates, koppen. The base map (ocean,
+coastline, borders, lakes) is world.pmtiles, built by build_tiles.sh.
 """
 
 import json
@@ -91,40 +87,6 @@ def lines_of(geom):
     if geom["type"] == "MultiLineString":
         return geom["coordinates"]
     return []
-
-
-# --- Base map (1:10m) ------------------------------------------------------
-
-# 0.005° (about 500 m) is below what the map shows at its deepest zoom.
-EPS = 0.005
-
-
-def base_lines(src, out):
-    feats = []
-    for f in load(src)["features"]:
-        for line in lines_of(f["geometry"]):
-            simp = dp(line, EPS)
-            if len(simp) >= 2:
-                feats.append({"type": "Feature", "properties": {},
-                              "geometry": {"type": "LineString",
-                                           "coordinates": [rnd(p, 3) for p in simp]}})
-    save(out, feats)
-
-
-def base_polygons(src, out):
-    feats = []
-    for f in load(src)["features"]:
-        g = f["geometry"]
-        polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
-        for poly in polys:
-            outer = dp(poly[0], EPS)
-            if len(outer) < 4:
-                continue
-            rings = [outer] + [r for r in (dp(h, EPS) for h in poly[1:]) if len(r) >= 4]
-            feats.append({"type": "Feature", "properties": {},
-                          "geometry": {"type": "Polygon",
-                                       "coordinates": [[rnd(p, 3) for p in r] for r in rings]}})
-    save(out, feats)
 
 
 # --- Rivers ---------------------------------------------------------------
@@ -432,10 +394,6 @@ def koppen():
 
 
 os.makedirs(OUT, exist_ok=True)
-base_polygons("ne_10m_ocean.geojson", "ocean")
-base_lines("ne_10m_coastline.geojson", "coastline")
-base_lines("ne_10m_admin_0_boundary_lines_land.geojson", "borders")
-base_polygons("ne_10m_lakes.geojson", "lakes")
 rivers()
 plates()
 koppen()
